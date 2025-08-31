@@ -1,0 +1,32 @@
+id: stage02
+title: 迷路ナビゲーション
+description: 迷路を抜けてゴールに到達するステージです。壁を避けながら最短経路を見つけましょう。
+
+board:
+  size: [7, 5]
+  grid:
+    - "#######"
+    - "#.....#"
+    - "#.###.#"
+    - "#.....#"
+    - "#######"
+  legend:
+    "#": "wall"
+    ".": "empty"
+    "P": "player"
+    "G": "goal"
+
+player:
+  start: [1, 1]
+  direction: "E"
+
+goal:
+  position: [5, 3]
+
+enemies: []
+
+items: []
+
+constraints:
+  max_turns: 30
+  allowed_apis: ["turn_left", "turn_right", "move", "see"]

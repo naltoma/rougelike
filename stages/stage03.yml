@@ -1,0 +1,34 @@
+id: stage03
+title: 複雑な経路
+description: より複雑な経路を通ってゴールを目指すステージです。移動禁止マスも登場します。
+
+board:
+  size: [6, 6]
+  grid:
+    - "......"
+    - ".##..."
+    - ".#X..."
+    - ".#.#.."
+    - "....#."
+    - "......"
+  legend:
+    "#": "wall"
+    ".": "empty"
+    "X": "forbidden"
+    "P": "player"
+    "G": "goal"
+
+player:
+  start: [0, 0]
+  direction: "S"
+
+goal:
+  position: [5, 5]
+
+enemies: []
+
+items: []
+
+constraints:
+  max_turns: 25
+  allowed_apis: ["turn_left", "turn_right", "move", "see"]

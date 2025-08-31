@@ -1,0 +1,33 @@
+id: stage01
+title: 基本移動ステージ
+description: 基本的な移動操作を学ぶステージです。turn_leftとturn_right、moveを使ってゴールを目指しましょう。
+
+board:
+  size: [5, 5]
+  grid:
+    - "....."
+    - "....."
+    - "..#.."
+    - "....."
+    - "....."
+  legend:
+    "#": "wall"
+    ".": "empty"
+    "P": "player"
+    "G": "goal"
+    "X": "forbidden"
+
+player:
+  start: [0, 0]
+  direction: "N"
+
+goal:
+  position: [4, 4]
+
+enemies: []
+
+items: []
+
+constraints:
+  max_turns: 20
+  allowed_apis: ["turn_left", "turn_right", "move", "see"]

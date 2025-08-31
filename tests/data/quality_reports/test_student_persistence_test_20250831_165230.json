@@ -1,0 +1,30 @@
+{
+  "student_id": "test_student",
+  "session_id": "persistence_test",
+  "timestamp": "2025-08-31T16:52:30.791204",
+  "overall_score": 0.75,
+  "code_metrics": {
+    "lines_of_code": 10,
+    "complexity_score": 0.0,
+    "readability_score": 0.8,
+    "efficiency_score": 0.0,
+    "error_density": 0.0,
+    "overall_quality": "poor"
+  },
+  "learning_metrics": {
+    "session_duration_seconds": 0.0,
+    "total_attempts": 5,
+    "successful_attempts": 4,
+    "success_rate": 0.8,
+    "error_count": 0,
+    "learning_efficiency": "struggling",
+    "improvement_rate": 0.0,
+    "consistency_score": 0.0
+  },
+  "recommendations": [
+    "テスト推奨事項"
+  ],
+  "achievements": [
+    "テスト達成項目"
+  ]
+}

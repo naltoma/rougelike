@@ -1,0 +1,21 @@
+# 基本依存関係
+pygame>=2.5.0
+PyYAML>=6.0
+requests>=2.31.0
+
+# テスト関連依存関係
+pytest>=7.4.0
+pytest-html>=3.1.0
+pytest-json-report>=1.5.0
+pytest-cov>=4.0.0
+pytest-xdist>=3.0.0
+pytest-mock>=3.10.0
+
+# 追加のpytestプラグイン
+pytest-clarity>=1.0.1
+pytest-sugar>=0.9.6
+pytest-benchmark>=4.0.0
+
+# Google Sheets連携（オプション）
+# gspread>=5.0.0
+# oauth2client>=4.1.3

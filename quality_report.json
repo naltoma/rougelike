@@ -1,0 +1,23 @@
+{
+  "generated_at": "2025-08-31 15:34:24",
+  "project_name": "Python初学者向けローグライクフレームワーク",
+  "version": "1.0.0",
+  "test_summary": {},
+  "recommendations": [
+    "pygame依存関係の解決でGUIレンダラーを有効化",
+    "より多くのステージファイルの作成",
+    "学生用チュートリアルドキュメントの作成",
+    "教師用管理ツールの開発",
+    "デプロイメント用Docker設定の追加"
+  ],
+  "file_statistics": {
+    "engine_files": 18,
+    "test_files": 25,
+    "total_engine_lines": 11149
+  },
+  "feature_coverage": {
+    "total_features": 11,
+    "implemented_features": 11,
+    "coverage_percentage": 100.0
+  }
+}

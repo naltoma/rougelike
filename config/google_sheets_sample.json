@@ -1,0 +1,35 @@
+{
+  "_comment": "Google Sheets統合設定サンプル",
+  "_instructions": [
+    "このファイルを google_sheets.json にコピーして設定してください",
+    "Google Cloud Console でプロジェクトとサービスアカウントを作成",
+    "Google Sheets API を有効化",
+    "サービスアカウントの認証情報JSONファイルをダウンロード",
+    "スプレッドシートを作成し、サービスアカウントに編集権限を付与"
+  ],
+  "enabled": false,
+  "service_account_path": "config/service-account.json",
+  "spreadsheet_id": "YOUR_SPREADSHEET_ID_HERE",
+  "worksheets": {
+    "student_progress": "学生進捗",
+    "session_logs": "セッション記録",
+    "code_analysis": "コード分析",
+    "learning_patterns": "学習パターン"
+  },
+  "update_frequency": 300,
+  "batch_size": 50,
+  "retry_attempts": 3,
+  "setup_instructions": {
+    "step1": "Google Cloud Console (console.cloud.google.com) にアクセス",
+    "step2": "新しいプロジェクトを作成または既存プロジェクトを選択",
+    "step3": "Google Sheets API を有効化",
+    "step4": "サービスアカウントを作成（IAM > Service Accounts）",
+    "step5": "サービスアカウントキー（JSON形式）をダウンロード",
+    "step6": "JSONファイルを config/service-account.json に配置",
+    "step7": "Google スプレッドシートを新規作成",
+    "step8": "スプレッドシートのIDをURLから取得してspreadsheet_idに設定",
+    "step9": "スプレッドシートをサービスアカウントのメールアドレスと共有（編集権限）",
+    "step10": "enabled を true に変更",
+    "step11": "pip install gspread oauth2client でライブラリをインストール"
+  }
+}
