@@ -507,11 +507,15 @@ class SessionLogger:
                     if self.log_buffer:
                         self._flush_logs()
                 
-                # 現在のセッションが有効な場合のみ再スケジュール
+                # 現在のセッションが有効な場合のみ再スケジュール（適切な間隔で）
                 if self.current_session:
-                    self._start_auto_flush()
+                    self._flush_timer = threading.Timer(self.auto_flush_interval, auto_flush)
+                    self._flush_timer.daemon = True
+                    self._flush_timer.start()
             except Exception as e:
                 self.system_logger.error(f"自動フラッシュエラー: {e}")
+                # エラー時はタイマーをクリア
+                self._flush_timer = None
         
         self._flush_timer = threading.Timer(self.auto_flush_interval, auto_flush)
         self._flush_timer.daemon = True

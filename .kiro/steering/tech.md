@@ -6,10 +6,13 @@
 - **配布方式**: conda環境配布、手動セットアップによる学習効果
 
 ## Frontend
-- **GUI**: pygame（デフォルト表示）
+- **GUI v1.1**: pygame（デフォルト表示・実行制御対応）
   - 2D描画、5x5〜10x10グリッド表示
   - キャラクター・敵・アイテム・壁の視覚化
   - 大型敵（2x2, 3x3）・特殊敵（2x3）対応
+  - **🆕 実行制御パネル**: Step/Continue/Pause/Stopボタン
+  - **🆕 一時停止機能**: solve()実行前の学習者確認
+  - **🆕 キーボードショートカット**: Space/Enter/Esc対応
 - **CUI**: テキストベース表示（学習目的・デバッグ用）
   - 同一ロジック、切替可能設計
 - **API設計**: 直感的関数名、向き制御重視
@@ -29,26 +32,70 @@
   - hashlib（コードハッシュ）
 - **API連携**: Google Sheets API（ログ送信）
 
+## 🆕 v1.1 Backend Components
+- **実行制御システム**: ExecutionController
+  - 段階的実行管理（Step/Continue/Pause/Stop）
+  - solve()実行前一時停止
+  - ExecutionMode状態管理（PAUSED/RUNNING/STOPPED）
+- **ハイパーパラメータ管理**: HyperParameterManager
+  - 学生ID自動検証（6桁数字+英大文字1桁）
+  - ステージID検証とバリデーション
+  - ログ設定管理と検証
+- **拡張セッションログ**: SessionLogManager
+  - 簡易版ログ機能の改善実装
+  - セッション開始・完了ログ記録
+  - エラーハンドリング強化
+- **アクション履歴**: ActionHistoryTracker
+  - 詳細な行動記録とトラッキング
+  - 学習分析用データ収集
+
 ## Development Environment
+- **Python**: 3.8+ 必須
 - **仮想環境**: conda推奨
 - **パッケージ管理**: pip（教育目的で手動インストール手順）
 - **設定ファイル**: 
-  - `env.yml` : conda環境定義
-  - `requirements.txt` : pip環境定義（併記）
+  - `requirements.txt` : pip環境定義（pytest統合）
+  - `conftest.py` : pytest設定
+  - `config.py` : プロジェクト設定
+
+## Testing Infrastructure (v1.0.1)
+- **フレームワーク**: pytest 7.4.0+
+- **プラグイン**: 
+  - pytest-html (HTML レポート)
+  - pytest-json-report (JSON出力)
+  - pytest-cov (カバレッジ測定)
+  - pytest-xdist (並列実行)
+  - pytest-mock (モック機能)
+  - pytest-clarity (改善された出力)
+  - pytest-sugar (プログレス表示)
+  - pytest-benchmark (ベンチマーク)
 
 ## Common Commands
 ```bash
 # 環境構築（教育目的で段階的に）
-conda create -n rougelike python=3.x
+conda create -n rougelike python=3.8+
 conda activate rougelike
-pip install pygame PyYAML requests
+pip install -r requirements.txt
 
 # 実行
-python main.py          # GUI mode（デフォルト）
+python main.py          # GUI v1.1 mode（デフォルト・実行制御対応）
 python main.py --cui    # CUI mode
+python main.py --gui    # 明示的GUI指定
+python student_example.py  # 学生サンプル実行
 
-# ログ送信
-python upload_logs.py   # 手動実行
+# テスト実行（推奨: pytest統合）
+python run_tests.py     # 高機能実行（失敗分析付き）
+pytest -v               # 基本pytest実行
+pytest --lf -v          # 失敗テストのみ再実行
+pytest -m "not gui" -v  # GUIテスト以外
+pytest -k "progression" -v  # パターンマッチ
+
+# Makefile実行
+make test               # 全テスト実行
+make test-failed        # 失敗テストのみ
+make test-no-gui        # GUIテスト以外
+make test-coverage      # カバレッジ付き
+make test-parallel      # 並列実行
 ```
 
 ## Environment Variables

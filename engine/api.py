@@ -26,6 +26,9 @@ from .commands import (
     TurnLeftCommand, TurnRightCommand, MoveCommand, 
     AttackCommand, PickupCommand, ExecutionResult
 )
+from .action_history_tracker import ActionHistoryTracker, ActionTrackingError
+from .execution_controller import ExecutionController
+from .session_log_manager import SessionLogManager
 
 
 class APIUsageError(Exception):
@@ -37,7 +40,8 @@ class APILayer:
     """学生向けAPI管理クラス"""
     
     def __init__(self, renderer_type: str = "cui", enable_progression: bool = True, 
-                 enable_session_logging: bool = True, enable_educational_errors: bool = True):
+                 enable_session_logging: bool = True, enable_educational_errors: bool = True,
+                 enable_action_tracking: bool = True):
         self.game_manager: Optional[GameStateManager] = None
         self.stage_loader = StageLoader()
         self.renderer = None
@@ -47,6 +51,20 @@ class APILayer:
         self.call_history: List[Dict[str, Any]] = []
         self._lock = threading.Lock()
         self.auto_render = True  # 自動レンダリングフラグ
+        
+        # GUI拡張機能v1.1 - アクション履歴追跡
+        self.action_tracker: Optional[ActionHistoryTracker] = None
+        self.action_tracking_enabled = enable_action_tracking
+        if enable_action_tracking:
+            self.action_tracker = ActionHistoryTracker()
+        
+        # GUI拡張機能v1.1 - 実行制御システム（外部から設定される）
+        self.execution_controller: Optional[ExecutionController] = None
+        
+        # GUI拡張機能v1.1 - セッションログ管理
+        self.session_log_manager: Optional[SessionLogManager] = None
+        if enable_session_logging:
+            self.session_log_manager = SessionLogManager()
         
         # 進捗管理システム
         self.progression_manager: Optional[ProgressionManager] = None
@@ -167,6 +185,10 @@ class APILayer:
             if self.session_logger:
                 self.session_logger.log_stage_start(stage_id)
             
+            # GUIレンダラーにExecutionControllerを設定
+            if hasattr(self.renderer, 'set_execution_controller') and self.execution_controller:
+                self.renderer.set_execution_controller(self.execution_controller)
+                
             print(f"✅ {stage_id} を初期化しました")
             print(f"📋 利用可能API: {', '.join(self.allowed_apis)}")
             
@@ -318,6 +340,14 @@ class APILayer:
             self._ensure_initialized()
             self._check_api_allowed("turn_left")
             
+            # アクション履歴追跡
+            if self.action_tracker:
+                self.action_tracker.track_action("turn_left")
+            
+            # 実行制御の待機処理
+            if self.execution_controller:
+                self.execution_controller.wait_for_action()
+            
             command = TurnLeftCommand()
             result = self.game_manager.execute_command(command)
             self._record_call("turn_left", result)
@@ -336,6 +366,14 @@ class APILayer:
         try:
             self._ensure_initialized()
             self._check_api_allowed("turn_right")
+            
+            # アクション履歴追跡
+            if self.action_tracker:
+                self.action_tracker.track_action("turn_right")
+            
+            # 実行制御の待機処理
+            if self.execution_controller:
+                self.execution_controller.wait_for_action()
             
             command = TurnRightCommand()
             result = self.game_manager.execute_command(command)
@@ -356,6 +394,14 @@ class APILayer:
             self._ensure_initialized()
             self._check_api_allowed("move")
             
+            # アクション履歴追跡
+            if self.action_tracker:
+                self.action_tracker.track_action("move")
+            
+            # 実行制御の待機処理
+            if self.execution_controller:
+                self.execution_controller.wait_for_action()
+            
             command = MoveCommand()
             result = self.game_manager.execute_command(command)
             self._record_call("move", result)
@@ -374,6 +420,14 @@ class APILayer:
         try:
             self._ensure_initialized()
             self._check_api_allowed("attack")
+            
+            # アクション履歴追跡
+            if self.action_tracker:
+                self.action_tracker.track_action("attack")
+            
+            # 実行制御の待機処理
+            if self.execution_controller:
+                self.execution_controller.wait_for_action()
             
             command = AttackCommand()
             result = self.game_manager.execute_command(command)
@@ -395,6 +449,14 @@ class APILayer:
             self._ensure_initialized()
             self._check_api_allowed("pickup")
             
+            # アクション履歴追跡
+            if self.action_tracker:
+                self.action_tracker.track_action("pickup")
+            
+            # 実行制御の待機処理
+            if self.execution_controller:
+                self.execution_controller.wait_for_action()
+            
             command = PickupCommand()
             result = self.game_manager.execute_command(command)
             self._record_call("pickup", result)
@@ -414,6 +476,14 @@ class APILayer:
         try:
             self._ensure_initialized()
             self._check_api_allowed("see")
+            
+            # アクション履歴追跡
+            if self.action_tracker:
+                self.action_tracker.track_action("see")
+            
+            # 実行制御の待機処理
+            if self.execution_controller:
+                self.execution_controller.wait_for_action()
             
             game_state = self.game_manager.get_current_state()
             if game_state is None:
@@ -768,6 +838,55 @@ class APILayer:
         if educational_error.severity == "critical":
             print("\n⚠️ 重要: この問題を解決してから続行してください")
     
+    def enable_action_tracking(self) -> None:
+        """アクション履歴追跡を有効化"""
+        if self.action_tracker:
+            self.action_tracker.enable_tracking()
+            print("📋 アクション履歴追跡を有効にしました")
+        else:
+            print("❌ アクション履歴追跡システムが初期化されていません")
+    
+    def disable_action_tracking(self) -> None:
+        """アクション履歴追跡を無効化"""
+        if self.action_tracker:
+            self.action_tracker.disable_tracking()
+            print("📋 アクション履歴追跡を無効にしました")
+        else:
+            print("❌ アクション履歴追跡システムが初期化されていません")
+    
+    def show_action_history(self, last_n: Optional[int] = 10) -> None:
+        """アクション履歴を表示"""
+        if self.action_tracker:
+            self.action_tracker.display_action_history(last_n)
+        else:
+            print("📋 アクション履歴: 追跡システムが無効です")
+    
+    def reset_action_history(self) -> None:
+        """アクション履歴をリセット"""
+        if self.action_tracker:
+            self.action_tracker.reset_counter()
+            print("🔄 アクション履歴をリセットしました")
+        else:
+            print("❌ アクション履歴追跡システムが初期化されていません")
+    
+    def get_action_count(self) -> int:
+        """実行アクション数を取得"""
+        if self.action_tracker:
+            return self.action_tracker.get_action_count()
+        return 0
+    
+    def get_action_history_summary(self) -> Dict[str, Any]:
+        """アクション履歴サマリーを取得"""
+        if self.action_tracker:
+            return self.action_tracker.get_history_summary()
+        return {
+            "total_actions": 0,
+            "unique_actions": 0,
+            "action_breakdown": {},
+            "history_size": 0,
+            "last_action": None
+        }
+    
     def end_session(self) -> None:
         """学習セッションを終了"""
         if self.session_logger:
@@ -1047,8 +1166,8 @@ class APILayer:
             print("-" * 30)
 
 
-# グローバルAPIインスタンス
-_global_api = APILayer()
+# グローバルAPIインスタンス（初期化は initialize_api で行う）
+_global_api = None
 
 
 def initialize_api(renderer_type: str = "cui", enable_progression: bool = True, 
@@ -1064,6 +1183,7 @@ def initialize_api(renderer_type: str = "cui", enable_progression: bool = True,
     global _global_api
     _global_api = APILayer(renderer_type, enable_progression, enable_session_logging)
     print(f"📺 APIレイヤーを{renderer_type.upper()}モードで初期化しました")
+    print(f"🔧 確認: renderer_type = {_global_api.renderer_type}")
     
     if enable_progression:
         print("📊 進捗管理システムが有効になりました")
@@ -1090,6 +1210,11 @@ def initialize_stage(stage_id: str) -> bool:
     Returns:
         bool: 初期化成功時True
     """
+    if _global_api is None:
+        raise APIUsageError(
+            "APIが初期化されていません。\n"
+            "まず initialize_api() を呼び出してください。"
+        )
     return _global_api.initialize_stage(stage_id)
 
 
@@ -1227,6 +1352,39 @@ def show_action_history(limit: int = 10) -> None:
         limit: 表示する履歴の件数
     """
     _global_api.show_action_history(limit)
+
+
+def enable_action_tracking() -> None:
+    """アクション履歴追跡を有効化"""
+    _global_api.enable_action_tracking()
+
+
+def disable_action_tracking() -> None:
+    """アクション履歴追跡を無効化"""
+    _global_api.disable_action_tracking()
+
+
+def reset_action_history() -> None:
+    """アクション履歴をリセット"""
+    _global_api.reset_action_history()
+
+
+def get_action_count() -> int:
+    """実行アクション数を取得
+    
+    Returns:
+        int: 実行されたアクション数
+    """
+    return _global_api.get_action_count()
+
+
+def get_action_history_summary() -> Dict[str, Any]:
+    """アクション履歴サマリーを取得
+    
+    Returns:
+        Dict: アクション履歴のサマリー情報
+    """
+    return _global_api.get_action_history_summary()
 
 
 def set_student_id(student_id: str) -> None:
@@ -1687,6 +1845,8 @@ __all__ = [
     "attack", "pickup", "see", "can_undo", "undo",
     "is_game_finished", "get_game_result", "get_call_history", "reset_stage",
     "show_current_state", "set_auto_render", "show_legend", "show_action_history",
+    "enable_action_tracking", "disable_action_tracking", "reset_action_history",
+    "get_action_count", "get_action_history_summary",
     "set_student_id", "show_progress_summary", "get_progress_report", 
     "get_learning_recommendations", "use_hint",
     "end_session", "get_session_summary", "list_session_history", 

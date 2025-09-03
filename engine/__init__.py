@@ -4,7 +4,7 @@ Python初学者向けローグライク演習フレームワーク
 """
 
 from enum import Enum
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
 
@@ -66,6 +66,17 @@ class EnemyType(Enum):
     LARGE_2X2 = "large_2x2"  # 大型敵 2x2
     LARGE_3X3 = "large_3x3"  # 大型敵 3x3
     SPECIAL_2X3 = "special_2x3"  # 特殊敵 2x3
+
+class ExecutionMode(Enum):
+    """実行モード"""
+    PAUSED = "paused"         # 一時停止
+    STEPPING = "stepping"     # ステップ実行
+    STEP_EXECUTING = "step_executing"  # 🆕 v1.2.1: ステップ実行中（単一アクション実行状態）
+    CONTINUOUS = "continuous" # 連続実行
+    PAUSE_PENDING = "pause_pending"    # 🆕 v1.2.1: 一時停止待機（次アクション境界で停止予定）
+    COMPLETED = "completed"   # 実行完了
+    RESET = "reset"          # 🆕 v1.2.1: リセット処理中
+    ERROR = "error"          # 🆕 v1.2.1: エラー状態
 
 @dataclass(frozen=True)
 class Position:
@@ -305,8 +316,159 @@ class LogEntry:
             "game_state_hash": self.game_state_hash
         }
 
+@dataclass
+class ExecutionState:
+    """実行状態の管理"""
+    mode: ExecutionMode = ExecutionMode.PAUSED
+    sleep_interval: float = 1.0  # デフォルト1秒
+    is_running: bool = False
+    step_count: int = 0
+    created_at: datetime = field(default_factory=datetime.now)
+    
+    # 🆕 v1.2.1: 拡張フィールド
+    current_action: Optional[str] = None          # 現在実行中のアクション名
+    pause_pending: bool = False                   # 一時停止要求フラグ
+    last_transition: Optional[datetime] = None    # 最終状態遷移時刻
+    error_state: Optional[str] = None             # エラー状態詳細
+    
+    def __post_init__(self):
+        """バリデーション"""
+        if self.sleep_interval < 0:
+            raise ValueError("sleep間隔は0以上である必要があります")
+        if self.step_count < 0:
+            raise ValueError("ステップ数は0以上である必要があります")
+    
+    def __str__(self):
+        """文字列表現"""
+        return f"ExecutionState(mode={self.mode.value}, steps={self.step_count}, running={self.is_running})"
+
+# 🆕 v1.2.1: 新規データモデルクラス
+
+@dataclass
+class ExecutionStateDetail:
+    """詳細な実行状態情報"""
+    mode: ExecutionMode
+    step_count: int
+    is_running: bool
+    current_action: Optional[str] = None
+    pause_pending: bool = False
+    last_transition: Optional[datetime] = None
+    error_state: Optional[str] = None
+    
+    def __post_init__(self):
+        """バリデーション"""
+        if self.step_count < 0:
+            raise ValueError("ステップ数は0以上である必要があります")
+
+@dataclass
+class PauseRequest:
+    """一時停止要求の管理"""
+    requested_at: datetime
+    requester: str  # 'user' | 'system'
+    target_boundary: str  # 'next_action' | 'immediate'
+    fulfilled: bool = False
+    
+    def __post_init__(self):
+        """バリデーション"""
+        if self.requester not in ['user', 'system']:
+            raise ValueError("requesterは'user'または'system'である必要があります")
+        if self.target_boundary not in ['next_action', 'immediate']:
+            raise ValueError("target_boundaryは'next_action'または'immediate'である必要があります")
+
+@dataclass
+class ResetResult:
+    """リセット操作の結果"""
+    success: bool
+    reset_timestamp: datetime
+    components_reset: List[str]
+    errors: List[str] = field(default_factory=list)
+    
+    def __post_init__(self):
+        """バリデーション"""
+        if not isinstance(self.components_reset, list):
+            raise ValueError("components_resetはリスト型である必要があります")
+
+@dataclass
+class StepResult:
+    """ステップ実行の結果"""
+    success: bool
+    action_executed: str
+    new_state: ExecutionMode
+    execution_time_ms: float
+    actions_executed: int = 0  # 🆕 v1.2.1: 実行されたアクション数
+    error_message: Optional[str] = None  # 🆕 v1.2.1: エラーメッセージ
+    
+    def __post_init__(self):
+        """バリデーション"""
+        if self.execution_time_ms < 0:
+            raise ValueError("実行時間は0以上である必要があります")
+
+@dataclass
+class ActionBoundary:
+    """アクション境界の定義"""
+    boundary_type: str  # 'api_call' | 'loop_iteration'
+    action_name: str
+    timestamp: datetime
+    sequence_number: int
+    
+    def __post_init__(self):
+        """バリデーション"""
+        if self.boundary_type not in ['api_call', 'loop_iteration']:
+            raise ValueError("boundary_typeは'api_call'または'loop_iteration'である必要があります")
+        if self.sequence_number < 1:
+            raise ValueError("sequence_numberは1以上である必要があります")
+
+# ExecutionControlError例外クラス階層
+class ExecutionControlError(Exception):
+    """実行制御関連のエラー基底クラス"""
+    pass
+
+class StepExecutionError(ExecutionControlError):
+    """ステップ実行エラー"""
+    pass
+
+class StepPauseException(ExecutionControlError):
+    """ステップ実行一時停止例外"""
+    pass
+    
+class PauseControlError(ExecutionControlError):
+    """一時停止制御エラー"""
+    pass
+    
+class ResetOperationError(ExecutionControlError):
+    """リセット操作エラー"""
+    pass
+
+class StateTransitionError(ExecutionControlError):
+    """状態遷移エラー"""
+    pass
+
+@dataclass  
+class ActionHistoryEntry:
+    """アクション履歴エントリ"""
+    sequence: int
+    action_name: str
+    timestamp: datetime
+    execution_result: Optional[Any] = None
+    
+    def __post_init__(self):
+        """バリデーション"""
+        if self.sequence < 1:
+            raise ValueError("シーケンス番号は1以上である必要があります")
+        if not self.action_name:
+            raise ValueError("アクション名は必須です")
+    
+    def __str__(self):
+        """文字列表現"""
+        return f"{self.sequence}: {self.action_name}()"
+
 __all__ = [
-    "Direction", "GameStatus", "ItemType", "EnemyType",
+    "Direction", "GameStatus", "ItemType", "EnemyType", "ExecutionMode",
     "Position", "Character", "Enemy", "Item", "Board",
-    "GameState", "Stage", "LogEntry"
+    "GameState", "Stage", "LogEntry", "ExecutionState", "ActionHistoryEntry",
+    # 🆕 v1.2.1: 新規データモデル
+    "ExecutionStateDetail", "PauseRequest", "ResetResult", "StepResult", "ActionBoundary",
+    # 🆕 v1.2.1: 例外クラス
+    "ExecutionControlError", "StepExecutionError", "PauseControlError", 
+    "ResetOperationError", "StateTransitionError"
 ]

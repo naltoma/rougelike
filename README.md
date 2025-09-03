@@ -1,13 +1,13 @@
 # Python初学者向けローグライク演習フレームワーク
 
-[![Version](https://img.shields.io/badge/version-v1.0.1-blue.svg)](VERSION_HISTORY.md)
+[![Version](https://img.shields.io/badge/version-v1.2.1-blue.svg)](VERSION_HISTORY.md)
 [![Python](https://img.shields.io/badge/python-3.8+-green.svg)](https://python.org)
 [![Tests](https://img.shields.io/badge/tests-88.9%25-brightgreen.svg)](#🧪-テスト実行)
 [![Quality](https://img.shields.io/badge/quality-優良⭐-gold.svg)](#📈-品質メトリクス)
 
 Python初学者のための教育用ローグライクゲームフレームワークです。体験的なプログラミング学習を通じて、基礎的なプログラミングスキルを習得できます。
 
-> **🔧 v1.0.1 pytest対応！** 高機能テストシステム搭載 - 詳細は [VERSION_HISTORY.md](VERSION_HISTORY.md) をご覧ください
+> **🎮 v1.2.1 GUI Critical Fixes完了！** Step/Pause/Resetボタンの完全修正 - 詳細は [VERSION_HISTORY.md](VERSION_HISTORY.md) をご覧ください
 
 ## 🎯 特徴
 

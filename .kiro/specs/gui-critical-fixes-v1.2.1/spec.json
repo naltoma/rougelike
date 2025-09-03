@@ -1,0 +1,23 @@
+{
+  "feature_name": "gui-critical-fixes-v1.2.1",
+  "language": "ja",
+  "created": "2025-09-02",
+  "phase": "tasks-generated",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": false
+    }
+  },
+  "estimated_complexity": "medium",
+  "priority": "critical",
+  "updated_at": "2025-09-02T00:00:00Z"
+}
