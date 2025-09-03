@@ -23,6 +23,7 @@ from engine.hyperparameter_manager import HyperParameterManager, HyperParameterE
 from engine.execution_controller import ExecutionController
 from engine.session_log_manager import SessionLogManager, LoggingSystemError
 from engine import StepPauseException
+from engine.solve_parser import parse_solve_function
 
 # ロギング設定
 logging.basicConfig(
@@ -36,6 +37,7 @@ logger = logging.getLogger(__name__)
 execution_controller = ExecutionController()
 hyperparameter_manager = HyperParameterManager()
 session_log_manager = SessionLogManager()
+solve_parser = None  # 動的solve()解析用
 
 def setup_stage(stage_id: str, student_id: str):
     """
@@ -74,6 +76,75 @@ def show_initial_state():
     print("🎯 初期状態:")
     show_current_state()
 
+def _get_solve_function_code() -> str:
+    """solve()関数のソースコードを取得"""
+    try:
+        import inspect
+        source_code = inspect.getsource(solve)
+        return source_code
+    except Exception as e:
+        return f"# ソースコード取得エラー: {e}"
+
+def _initialize_solve_parser():
+    """solve()関数を解析してsolve_parserを初期化"""
+    global solve_parser
+    try:
+        solve_parser = parse_solve_function(solve)
+        print(f"📋 solve()関数解析完了: {solve_parser.total_steps}ステップ検出")
+        return True
+    except Exception as e:
+        print(f"⚠️ solve()解析エラー: {e}")
+        return False
+
+def _execute_solve_step(step_number: int) -> bool:
+    """指定されたステップのsolve()アクションを実行"""
+    global solve_parser
+    
+    if not solve_parser:
+        print("❌ solve_parserが初期化されていません")
+        return False
+    
+    # ステップ番号を調整（1-basedから0-basedへ）
+    solve_parser.current_step = step_number - 1
+    action = solve_parser.get_next_action()
+    
+    if not action:
+        print(f"⚠️ ステップ {step_number}: 実行するアクションがありません")
+        return False
+    
+    try:
+        # アクションを実行
+        from engine.api import turn_right, turn_left, move, attack, pickup, see
+        
+        if action.action_type == 'turn_right':
+            print(f"➡️ 右に回転... (step {step_number})")
+            turn_right()
+        elif action.action_type == 'turn_left':
+            print(f"⬅️ 左に回転... (step {step_number})")
+            turn_left()
+        elif action.action_type == 'move':
+            print(f"🚶 前進... (step {step_number})")
+            move()
+        elif action.action_type == 'attack':
+            print(f"⚔️ 攻撃... (step {step_number})")
+            attack()
+        elif action.action_type == 'pickup':
+            print(f"🎒 アイテム取得... (step {step_number})")
+            pickup()
+        elif action.action_type == 'see':
+            print(f"👁️ 周囲確認... (step {step_number})")
+            see()
+        else:
+            print(f"❓ 不明なアクション: {action.action_type}")
+            return False
+        
+        print(f"✅ ステップ {step_number}/{solve_parser.total_steps} 完了: {action.action_type}")
+        return True
+        
+    except Exception as e:
+        print(f"❌ ステップ {step_number} 実行エラー: {e}")
+        return False
+
 def show_results():
     """
     結果表示
@@ -81,11 +152,22 @@ def show_results():
     """
     from engine.api import get_game_result, show_current_state
     
-    result = get_game_result()
-    print(f"\n🏁 最終結果: {result}")
+    try:
+        result = get_game_result()
+        print(f"\n🏁 最終結果: {result}")
+    except SystemExit:
+        print("🚪 システム終了中のためゲーム結果表示をスキップします")
+        return
+    except Exception as e:
+        print(f"⚠️ ゲーム結果取得エラー: {e}")
     
-    print("🎯 最終状態:")
-    show_current_state()
+    try:
+        print("🎯 最終状態:")
+        show_current_state()
+    except SystemExit:
+        print("🚪 システム終了中のため状態表示をスキップします")
+    except Exception as e:
+        print(f"⚠️ 現在状態表示エラー: {e}")
 
 # ================================
 # 📌 ハイパーパラメータ設定セクション
@@ -138,7 +220,7 @@ def solve():
         move()    # 東に移動
     
     # 南を向いて移動
-    print("⬇️ 南方向へ移動中...")
+    #print("⬇️ 南方向へ移動中...")
     turn_right()  # 南を向く
     for _ in range(4):
         move()    # 南に移動
@@ -182,20 +264,26 @@ def _wait_for_gui_close():
         waiting = True
         
         while waiting:
-            # レンダラーのイベント処理を呼び出し（Exitボタン等のクリック処理含む）
-            if hasattr(_global_api.renderer, '_handle_events'):
-                _global_api.renderer._handle_events()
-                
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    waiting = False
-                elif event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_ESCAPE:
+            try:
+                # レンダラーのイベント処理を呼び出し（Exitボタン等のクリック処理含む）
+                if hasattr(_global_api.renderer, '_handle_events'):
+                    _global_api.renderer._handle_events()
+                    
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
                         waiting = False
-                        
-            # 画面更新はしない（表示を固定）
-            # 単純にイベント待機のみ
-            clock.tick(30)  # 30 FPS
+                    elif event.type == pygame.KEYDOWN:
+                        if event.key == pygame.K_ESCAPE:
+                            waiting = False
+                            
+                # 画面更新はしない（表示を固定）
+                # 単純にイベント待機のみ
+                clock.tick(30)  # 30 FPS
+                
+            except (pygame.error, SystemExit):
+                # pygame終了済みまたはシステム終了
+                print("🚪 アプリケーション終了")
+                waiting = False
             
     except (ImportError, AttributeError):
         # pygameが利用できない場合はフォールバック
@@ -259,11 +347,29 @@ def main():
     if logging_enabled:
         try:
             print("📝 セッションログシステムを初期化中...")
-            session_log_manager.enable_default_logging(student_id, stage_id)
-            session_log_manager.log_session_start({
-                "display_mode": display_mode,
-                "framework_version": "v1.1"
-            })
+            result = session_log_manager.enable_default_logging(student_id, stage_id)
+            if result.success:
+                print(f"✅ セッションログ有効化完了")
+                print(f"📂 ログファイル: {result.log_path}")
+                
+                # solve()関数のソースコード取得
+                solve_code = _get_solve_function_code()
+                
+                # セッション情報を設定（コード含む）
+                if session_log_manager.session_logger:
+                    session_log_manager.session_logger.set_session_info(
+                        stage_id=stage_id, 
+                        solve_code=solve_code
+                    )
+                    session_log_manager.session_logger.log_event("session_start", {
+                        "display_mode": display_mode,
+                        "framework_version": "v1.2.2",
+                        "stage_id": stage_id,
+                        "student_id": student_id
+                    })
+            else:
+                print(f"⚠️ ログシステム初期化警告: {result.error_message}")
+                print("ログなしで実行を継続します")
         except LoggingSystemError as e:
             print(f"⚠️ ログシステム初期化警告: {e}")
             print("ログなしで実行を継続します")
@@ -287,6 +393,20 @@ def main():
         sys.exit(1)
         
     show_initial_state()
+    
+    # solve()関数解析の初期化
+    print("\n🔍 solve()関数を解析中...")
+    if not _initialize_solve_parser():
+        print("⚠️ solve()解析に失敗しましたが、継続します")
+    else:
+        # solve()解析結果の表示
+        if solve_parser:
+            print(f"📊 solve()解析結果:")
+            summary = solve_parser.get_action_summary()
+            for item in summary[:10]:  # 最初の10ステップまで表示
+                print(f"   {item['step']}. {item['action']} (line {item['line']})")
+            if len(summary) > 10:
+                print(f"   ... 他 {len(summary) - 10} ステップ")
     
     try:
         # solve()実行前の一時停止（要求仕様1.1）
@@ -415,35 +535,20 @@ def main():
                 time.sleep(0.1)  # 100ms待機
             
             elif current_mode == ExecutionMode.STEPPING:
-                # ステップ実行モード：solve()アクションを1つずつ実行（ハードコーディング方式）
+                # ステップ実行モード：solve()を動的解析して1つずつ実行
                 if execution_controller.single_step_requested:
                     print("🔍 ステップ実行: solve()の1アクションを実行中...")
                     try:
-                        # solve()関数のハードコードされたシーケンス（pygameスレッド制約対応）
-                        from engine.api import turn_right, move
-                        
+                        # solve()関数の動的解析による実行
                         step_num = execution_controller.state.step_count
                         
-                        # solve()の実際のシーケンス（main.py Line 135-143参考）：
-                        # 1: turn_right() - 東を向く
-                        # 2-5: move() x4 - 東に移動  
-                        # 6: turn_right() - 南を向く
-                        # 7-10: move() x4 - 南に移動
-                        
-                        if step_num == 1:
-                            print("➡️ 東方向を向く...")
-                            turn_right()  # 東を向く
-                        elif 2 <= step_num <= 5:
-                            print("➡️ 東方向へ移動...")
-                            move()  # 東に移動
-                        elif step_num == 6:
-                            print("⬇️ 南方向を向く...")
-                            turn_right()  # 南を向く
-                        elif 7 <= step_num <= 10:
-                            print("⬇️ 南方向へ移動...")
-                            move()  # 南に移動
+                        # 動的solve()解析によるステップ実行
+                        if solve_parser and step_num <= solve_parser.total_steps:
+                            success = _execute_solve_step(step_num)
+                            if not success:
+                                print(f"⚠️ ステップ {step_num} の実行に失敗しました")
                         else:
-                            print("🎉 solve()完了 - すべてのアクションを実行しました")
+                            print("🎉 solve()完了 - 実装されたアクションをすべて実行しました")
                             execution_controller.mark_solve_complete()
                             
                         # ステップ完了を通知  
@@ -468,25 +573,16 @@ def main():
                             step_result = execution_controller.step_execution()
                             print(f"🚀 連続実行の最初のステップ実行: {step_result.success}")
                         
-                        # solve()関数のハードコードされたシーケンス（Pauseボタン対応）
-                        from engine.api import turn_right, move
-                        
+                        # solve()関数の動的解析による実行（連続実行モード）
                         step_num = execution_controller.state.step_count
                         
-                        if step_num == 1:
-                            print("➡️ 東方向を向く...")
-                            turn_right()  # 東を向く
-                        elif 2 <= step_num <= 5:
-                            print("➡️ 東方向へ移動...")
-                            move()  # 東に移動
-                        elif step_num == 6:
-                            print("⬇️ 南方向を向く...")
-                            turn_right()  # 南を向く
-                        elif 7 <= step_num <= 10:
-                            print("⬇️ 南方向へ移動...")
-                            move()  # 南に移動
+                        # 動的solve()解析によるステップ実行
+                        if solve_parser and step_num <= solve_parser.total_steps:
+                            success = _execute_solve_step(step_num)
+                            if not success:
+                                print(f"⚠️ ステップ {step_num} の実行に失敗しました")
                         else:
-                            print("🎉 solve()完了 - すべてのアクションを実行しました")
+                            print("🎉 solve()完了 - 実装されたアクションをすべて実行しました")
                             execution_controller.mark_solve_complete()
                             
                         # ステップ完了を通知  
@@ -537,6 +633,9 @@ def main():
         final_mode = execution_controller.state.mode
         print(f"\n✅ GUIループ終了: {final_mode.value}モード")
         
+    except SystemExit:
+        # Exitボタンやsys.exit()による正常な終了
+        print("🚪 Exitボタンまたはシステム終了が要求されました")
     except Exception as e:
         print(f"❌ solve()関数でエラーが発生: {e}")
         import traceback
@@ -546,16 +645,52 @@ def main():
         show_results()
         
         # セッション完了ログ記録（要求仕様4.4）
-        if logging_enabled and session_log_manager.is_logging_enabled():
+        if logging_enabled and session_log_manager.enabled and session_log_manager.session_logger:
             try:
+                # 実際のゲーム結果を確認
+                from engine.api import _global_api, get_game_result
+                game_completed = False
+                actual_action_count = 0
+                
+                try:
+                    # ゲーム結果を取得
+                    result_text = get_game_result()
+                    game_completed = "ゴール到達" in result_text or "ゲームクリア" in result_text
+                    
+                    # 実際のアクション数を取得
+                    if _global_api and _global_api.action_tracker:
+                        actual_action_count = _global_api.action_tracker.get_action_count()
+                except Exception as e:
+                    print(f"⚠️ ゲーム結果確認エラー: {e}")
+                
                 execution_summary = {
-                    "completed_successfully": True,
+                    "completed_successfully": game_completed,
                     "total_execution_time": "N/A",  # 実際の計測は今後実装
-                    "action_count": 0  # ActionHistoryTrackerとの連携で実装
+                    "action_count": actual_action_count
                 }
-                session_log_manager.log_session_complete(execution_summary)
+                session_log_manager.session_logger.log_event("session_complete", execution_summary)
+                print("\n📝 セッション完了ログを記録しました")
             except LoggingSystemError as e:
                 print(f"⚠️ セッション完了ログ記録エラー: {e}")
+        
+        # ログファイルの場所とアクセス方法を表示
+        if logging_enabled and session_log_manager.enabled:
+            try:
+                print("\n" + "="*60)
+                print("📊 セッションログが生成されました")
+                print("="*60)
+                
+                # ログファイル情報の表示
+                session_log_manager.show_log_info()
+                
+                print("🔍 ログ確認コマンド:")
+                print("  python show_session_logs.py           # 全ログ表示")
+                print("  python show_session_logs.py --latest   # 最新ログのみ")
+                print("  python show_session_logs.py --validate # 整合性チェック")
+                print()
+                
+            except Exception as e:
+                print(f"⚠️ ログ情報表示エラー: {e}")
         
         # 実行完了後の最終待機（要求仕様1.6）
         print("\n🏁 すべてのタスクが完了しました")

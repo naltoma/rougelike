@@ -27,12 +27,12 @@ Python初学者向け演習フレームワーク - ローグライク風ステ�
 - **教員支援**: 自動ログ収集・分析による学習状況把握
 - **高度テストシステム**: pytest対応、88.9%成功率、失敗分析・再実行機能
 
-## Current Version: v1.1 (GUI Enhanced Production Ready)
-- **コアエンジン**: 21ファイル (拡張) - 完全実装済み + v1.1機能
+## Current Version: v1.2.1 (GUI Critical Fixes Complete)
+- **コアエンジン**: 21ファイル (拡張) - 完全実装済み + v1.2.1機能
 - **テストスイート**: 26ファイル - pytest統合、マーカー対応
 - **品質評価**: 優良⭐ (機能カバレッジ100%, テスト成功率88.9%)
 - **高機能テスト**: 失敗分析、再実行、並列実行、カバレッジ対応
-- **🆕 v1.1新機能**: 実行制御システム、GUI改善、ハイパーパラメータ管理
+- **🆕 v1.2.1新機能**: GUI Critical Fixes（Step/Pause/Resetボタンの完全修正）
 
 ## Core Implemented Features  
 - GUI（pygame）+ CUI両対応、デフォルトGUI
@@ -56,6 +56,13 @@ Python初学者向け演習フレームワーク - ローグライク風ステ�
 - **ハイパーパラメータ検証**: 学生ID・ステージID自動バリデーション
 - **拡張セッションログ管理**: SessionLogManager による改善されたログ機能
 - **アクション履歴トラッキング**: ActionHistoryTracker による詳細行動記録
+
+## 🔧 v1.2.1 GUI Critical Fixes Features
+- **Stepボタン完全修正**: 1ボタンで1アクションの確実実行、連続押下対応
+- **Pauseボタン機能安定化**: 連続実行中のアクション境界での正確一時停止
+- **Resetボタン包括修正**: システム全体の完全リセット（step_count、アクション履歴含む）
+- **Continue実行最適化**: GUIループ継続条件修正による安定動作
+- **状態管理強化**: ExecutionController状態管理とActionHistoryTrackerの統合改善
 
 ## Advanced Testing Framework
 - **pytest統合**: 高機能テスト実行と分析

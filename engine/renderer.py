@@ -332,10 +332,17 @@ class GuiRenderer(Renderer):
         game_area_width = self.width * self.cell_size
         game_area_height = self.height * self.cell_size
         
+        # サイドバーに必要な最小高さを計算
+        min_sidebar_height = 60 + 130 + 200 + 30  # ヘッダー + プレイヤー情報 + ゲーム情報 + 凡例 + 余裕
+        
         # 情報パネル・コントロールパネルの720px幅を考慮した画面サイズ計算
         info_control_width = 720  # 情報パネルとコントロールパネルの幅
         screen_width = max(game_area_width + self.sidebar_width + self.margin * 3, info_control_width + self.sidebar_width + self.margin * 3)
-        screen_height = game_area_height + self.info_height + self.control_panel_height + self.margin * 4
+        
+        # サイドバーの高さも考慮したウィンドウ高さを計算
+        base_height = game_area_height + self.info_height + self.control_panel_height + self.margin * 4
+        sidebar_required_height = min_sidebar_height + self.control_panel_height + self.margin * 3  # コントロールパネルとマージンも考慮
+        screen_height = max(base_height, sidebar_required_height)
         
         # pygame 画面初期化
         pygame.display.init()  # ディスプレイ明示的初期化
@@ -489,9 +496,9 @@ class GuiRenderer(Renderer):
         self.screen.blit(stage_info_surface, (self.margin, self.margin + 5))
         
         # サイドバー背景（十分に高く - 全ての要素が収まるように）
-        # 最小高さを計算: プレイヤー情報 + ゲーム情報 + 凡例
-        min_sidebar_height = 60 + 130 + 200 + 30  # ヘッダー + プレイヤー情報 + ゲーム情報 + 凡例（拡大） + 30px拡張
-        calculated_height = self.height * self.cell_size + self.info_height + self.control_panel_height
+        # 最小高さは初期化時に計算済みなので、同じ値を使用
+        min_sidebar_height = 60 + 130 + 200 + 30  # ヘッダー + プレイヤー情報 + ゲーム情報 + 凡例 + 余裕
+        calculated_height = self.height * self.cell_size
         sidebar_height = max(calculated_height, min_sidebar_height)
         sidebar_rect = pygame.Rect(sidebar_x, sidebar_y, 
                                  self.sidebar_width, 

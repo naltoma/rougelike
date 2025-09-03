@@ -243,32 +243,11 @@ class APILayer:
                 self._check_infinite_loop()
         
         self.last_action_time = current_time
-        
-        # セッションログ: アクション記録
-        if self.session_logger:
-            game_state = self.game_manager.get_current_state() if self.game_manager else None
-            turn_number = self.game_manager.get_turn_count() if self.game_manager else None
-            
-            self.session_logger.log_action(
-                action=api_name,
-                success=result.is_success,
-                message=result.message,
-                turn_number=turn_number,
-                game_state=game_state
-            )
-        
-        # データアップロード: セッションログ送信
-        if self.data_uploader and self.current_session_id:
-            log_data = {
-                "student_id": self.student_id,
-                "api_name": api_name,
-                "success": result.is_success,
-                "message": result.message,
-                "execution_time": getattr(result, 'execution_time', 0.0),
-                "error_message": result.message if not result.is_success else "",
-                "position": str(game_state.player.position) if game_state else ""
-            }
-            self.data_uploader.queue_session_log(self.current_session_id, log_data)
+    
+    def _log_action(self, action_name: str) -> None:
+        """アクションをセッションログに記録"""
+        if self.session_log_manager and self.session_log_manager.session_logger:
+            self.session_log_manager.session_logger.log_event(action_name, {"timestamp": datetime.now().isoformat()})
     
     def _check_auto_hint(self, current_time: datetime) -> None:
         """自動ヒントシステムをチェック"""
@@ -344,6 +323,9 @@ class APILayer:
             if self.action_tracker:
                 self.action_tracker.track_action("turn_left")
             
+            # セッションログ記録
+            self._log_action("turn_left")
+            
             # 実行制御の待機処理
             if self.execution_controller:
                 self.execution_controller.wait_for_action()
@@ -371,6 +353,9 @@ class APILayer:
             if self.action_tracker:
                 self.action_tracker.track_action("turn_right")
             
+            # セッションログ記録
+            self._log_action("turn_right")
+            
             # 実行制御の待機処理
             if self.execution_controller:
                 self.execution_controller.wait_for_action()
@@ -397,6 +382,9 @@ class APILayer:
             # アクション履歴追跡
             if self.action_tracker:
                 self.action_tracker.track_action("move")
+            
+            # セッションログ記録
+            self._log_action("move")
             
             # 実行制御の待機処理
             if self.execution_controller:

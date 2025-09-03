@@ -1,0 +1,22 @@
+{
+  "feature_name": "session-logging-enhancement-v1.2.2",
+  "created_at": "2025-09-03T09:30:00Z",
+  "updated_at": "2025-09-03T15:00:00Z",
+  "language": "japanese",
+  "phase": "tasks-generated",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": false
+    }
+  },
+  "ready_for_implementation": false
+}

@@ -10,13 +10,14 @@ rougelike/
 │       └── gui-critical-fixes-v1.2.1/  # 🆕 v1.2.1 Critical button fixes spec
 ├── .claude/            # Claude Code commands
 ├── docs/               # Project documentation
-│   ├── v1.1.md         # 🆕 v1.1 Enhancement documentation
+│   ├── v1.2.1.md       # 🆕 v1.2.1 Critical Fixes documentation
+│   ├── v1.1.md         # v1.1 Enhancement documentation
 │   └── v0_1st_plan.md  # Original planning documents
-├── engine/             # Core game engine (21 files + v1.1 enhancements)
+├── engine/             # Core game engine (21 files + v1.2.1 critical fixes)
 ├── stages/             # YAML stage definitions
 ├── tests/              # Comprehensive test suite (26+ files)
 ├── temp/               # Temporary files and screenshots
-├── main.py             # Entry point (v1.1 enhanced with execution control)
+├── main.py             # Entry point (v1.2.1 GUI loop fixes)
 ├── student_example.py  # Student sample code
 ├── run_tests.py        # Pytest integration runner
 ├── conftest.py         # Pytest configuration
@@ -28,7 +29,7 @@ rougelike/
 
 ## Subdirectory Structures
 
-### `/engine/` - Core Game Engine (v1.1 - GUI Enhanced Implementation)
+### `/engine/` - Core Game Engine (v1.2.1 - GUI Critical Fixes Complete)
 ```
 engine/
 ├── __init__.py                 # Core data models (9,705 bytes)
@@ -193,6 +194,13 @@ from engine.renderer import GuiRenderer, CuiRenderer
 - **Progressive disclosure**: Execution control complexity introduced gradually
 - **Error isolation**: Execution problems don't crash the learning environment
 
+### 🔧 7. v1.2.1 GUI Stability & Reliability (CRITICAL FIXES)
+- **Button reliability**: Step/Pause/Reset buttons with guaranteed functionality
+- **State consistency**: Accurate step counting and action history management
+- **System integrity**: Complete reset functionality for learning session restart
+- **Execution stability**: Robust continuous and step execution modes
+- **Error resilience**: Improved error handling and recovery mechanisms
+
 ## Development Workflow
 1. **Stage Design**: Create YAML in `/stages/`
 2. **Engine Updates**: Modify `/engine/` for new features  
@@ -200,9 +208,9 @@ from engine.renderer import GuiRenderer, CuiRenderer
 4. **Student API**: Update `/engine/api.py` if needed
 5. **Documentation**: Update README.md and `/docs/`
 
-## Testing Strategy (v1.1 - pytest + GUI Enhancements Complete)
-- **Comprehensive Coverage**: 26+ test files covering all 21 engine components (including v1.1)
-- **Test Success Rate**: 88.9% (23/26 tests passing) - maintained with v1.1 additions
+## Testing Strategy (v1.2.1 - pytest + GUI Critical Fixes Validated)
+- **Comprehensive Coverage**: 26+ test files covering all 21 engine components (including v1.2.1)
+- **Test Success Rate**: 88.9% (23/26 tests passing) - maintained through v1.2.1 fixes
 - **pytest Integration**: Full pytest framework with markers and plugins
 - **Test Categories**:
   - Unit tests: Isolated component testing
@@ -210,7 +218,7 @@ from engine.renderer import GuiRenderer, CuiRenderer
   - GUI tests: pygame rendering tests (marked with @pytest.mark.gui)
   - Session tests: Learning session workflows
   - Google Sheets tests: API integration tests
-  - **🆕 v1.1 tests**: Execution control, hyperparameter validation, enhanced logging
+  - **🔧 v1.2.1 tests**: GUI critical fixes validation, button functionality testing
 - **Advanced Features**:
   - Test markers: unit/integration/gui classification
   - Failed test analysis and re-run commands
@@ -218,4 +226,4 @@ from engine.renderer import GuiRenderer, CuiRenderer
   - Coverage reporting with pytest-cov
   - HTML/JSON test reports
 - **Quality Assurance**: Automated quality metrics and test-driven development
-- **🆕 v1.1 Test Coverage**: ExecutionController, HyperParameterManager, SessionLogManager integration
+- **🔧 v1.2.1 Test Coverage**: Step/Pause/Reset button functionality, execution controller stability

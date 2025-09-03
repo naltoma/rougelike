@@ -6,7 +6,7 @@
 - **配布方式**: conda環境配布、手動セットアップによる学習効果
 
 ## Frontend
-- **GUI v1.1**: pygame（デフォルト表示・実行制御対応）
+- **GUI v1.2.1**: pygame（デフォルト表示・実行制御対応・Critical Fixes完了）
   - 2D描画、5x5〜10x10グリッド表示
   - キャラクター・敵・アイテム・壁の視覚化
   - 大型敵（2x2, 3x3）・特殊敵（2x3）対応
@@ -49,6 +49,18 @@
   - 詳細な行動記録とトラッキング
   - 学習分析用データ収集
 
+## 🔧 v1.2.1 Backend Critical Fixes
+- **ExecutionController最適化**: Step実行状態管理の改善
+  - 1ボタン1アクション実行の確実な制御
+  - step_countの正確な管理とリセット処理
+  - pause_requestedフラグの適切な状態遷移
+- **main.py GUIループ修正**: should_continue_main_loop()にCONTINUOUSモード追加
+  - 連続実行フローの安定化
+  - GUI画面更新の最適化
+- **ActionHistoryTracker統合強化**: reset_counter()のシステムリセット統合
+  - 完全なシステムリセット処理
+  - アクション履歴番号の適切なリセット
+
 ## Development Environment
 - **Python**: 3.8+ 必須
 - **仮想環境**: conda推奨
@@ -78,7 +90,7 @@ conda activate rougelike
 pip install -r requirements.txt
 
 # 実行
-python main.py          # GUI v1.1 mode（デフォルト・実行制御対応）
+python main.py          # GUI v1.2.1 mode（デフォルト・Critical Fixes完了）
 python main.py --cui    # CUI mode
 python main.py --gui    # 明示的GUI指定
 python student_example.py  # 学生サンプル実行
