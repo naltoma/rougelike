@@ -1,13 +1,13 @@
 # Python初学者向けローグライク演習フレームワーク
 
-[![Version](https://img.shields.io/badge/version-v1.2.1-blue.svg)](VERSION_HISTORY.md)
+[![Version](https://img.shields.io/badge/version-v1.2.3-blue.svg)](VERSION_HISTORY.md)
 [![Python](https://img.shields.io/badge/python-3.8+-green.svg)](https://python.org)
 [![Tests](https://img.shields.io/badge/tests-88.9%25-brightgreen.svg)](#🧪-テスト実行)
 [![Quality](https://img.shields.io/badge/quality-優良⭐-gold.svg)](#📈-品質メトリクス)
 
 Python初学者のための教育用ローグライクゲームフレームワークです。体験的なプログラミング学習を通じて、基礎的なプログラミングスキルを習得できます。
 
-> **🎮 v1.2.1 GUI Critical Fixes完了！** Step/Pause/Resetボタンの完全修正 - 詳細は [VERSION_HISTORY.md](VERSION_HISTORY.md) をご覧ください
+> **🔗 v1.2.3 Google Sheets連携完了！** 無料Google Apps Script Webhook方式で簡単セットアップを実現 - 詳細は [VERSION_HISTORY.md](VERSION_HISTORY.md) をご覧ください
 
 ## 🎯 特徴
 
@@ -19,9 +19,9 @@ Python初学者のための教育用ローグライクゲームフレームワ�
 
 ### 📊 教師支援機能
 - **リアルタイム学習データ収集**: 学習者の行動を詳細記録
-- **Google Sheets連携**: クラス全体の進捗を一元管理
-- **自動学習パターン分析**: 問題行動の早期発見
-- **個別支援推奨**: データに基づく指導提案
+- **Google Sheets連携**: 無料Webhook方式で簡単5分セットアップ
+- **ステージ別データ管理**: 自動シート作成・上書き機能
+- **個別支援推奨**: 完了フラグ・アクション数・コード行数分析
 
 ### 🎮 豊富なゲーム要素
 - **高度な敵AIシステム**: 巡回、追跡、警備、ハンター
@@ -46,7 +46,7 @@ rougelike/
 │   ├── quality_assurance.py # 品質保証
 │   ├── progress_analytics.py # 進歩分析
 │   ├── educational_feedback.py # 教育フィードバック
-│   ├── data_uploader.py     # データアップロード
+│   ├── webhook_uploader.py  # Webhook連携
 │   ├── enemy_system.py      # 敵システム
 │   ├── item_system.py       # アイテムシステム
 │   ├── advanced_game_state.py # 拡張ゲーム状態
@@ -183,23 +183,35 @@ pytest統合実行では以下の機能を提供：
 
 ## 📊 Google Sheets連携設定
 
-教師向け学習データ管理機能を使用する場合:
+**v1.2.3 新機能**: 無料Google Apps Script Webhook連携
 
-1. **Google Cloud Console設定**
-   ```bash
-   # 必要なライブラリをインストール
-   pip install gspread oauth2client
-   ```
+### 🚀 教員向けセットアップ（5分）
+1. **Google Apps Script設定**
+   - [Code.gs](google_apps_script/Code.gs) をGoogle Apps Scriptにコピー&貼り付け
+   - Webhookエンドポイントをデプロイ
+   - （オプション）共有フォルダID設定
 
-2. **設定ファイル作成**
-   ```bash
-   # サンプル設定をコピー
-   cp config/google_sheets_sample.json config/google_sheets.json
-   ```
+詳しくは [教員セットアップガイド](docs/teacher_setup_guide.md) を参照
 
-3. **詳細なセットアップ手順**
-   
-   詳しくは [GOOGLE_SHEETS_SETUP.md](GOOGLE_SHEETS_SETUP.md) を参照してください。
+### 📤 学生向けセットアップ（1分）
+```bash
+# 初回設定
+python upload_webhook.py --setup
+
+# ログアップロード
+python upload_webhook.py stage01
+
+# 接続テスト
+python upload_webhook.py --test
+```
+
+詳しくは [学生セットアップガイド](docs/student_setup_guide.md) を参照
+
+### 特徴
+- **完全無料**: OAuth2認証不要、Google Apps Scriptの無料枠内
+- **簡単セットアップ**: 複雑な設定ファイル・認証情報不要
+- **自動管理**: ステージ別シート作成、同一学生データ自動上書き
+- **7項目データ**: 学生ID・ステージ・終了日時・完了フラグ・アクション数・コード行数・解法コード
 
 ## 🎓 教育的価値
 
@@ -305,11 +317,11 @@ Python初学者教育の向上を目指して開発されました。教育現�
 
 ## 📋 更新履歴
 
-最新バージョン: **v1.0.1** (2025年8月31日)
-- 🧪 pytest対応テストシステム実装
-- 🔄 失敗テストの分析・再実行機能
-- 📊 テストマーカーとMakefile対応
-- ⚡ 並列テスト実行とカバレッジ対応
+最新バージョン: **v1.2.3** (2025年9月4日)
+- 🔗 Google Apps Script Webhook連携完了
+- 📊 無料・簡単セットアップ（教員5分・学生1分）
+- 🎯 ステージ別シート自動管理・上書き機能
+- 📝 7項目教育データ（完了フラグ・アクション数・コード行数等）
 
 詳細な変更履歴は [VERSION_HISTORY.md](VERSION_HISTORY.md) をご覧ください。
 
@@ -321,4 +333,4 @@ AI-DLC（AI-Driven Development Life Cycle） と Spec-Driven Development（仕�
 
 ---
 
-**🎮 楽しく学び、効果的に指導する - Python教育の新しい形 v1.0.1**
+**🎮 楽しく学び、効果的に指導する - Python教育の新しい形 v1.2.3**
