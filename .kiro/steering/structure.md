@@ -10,14 +10,17 @@ rougelike/
 │       └── gui-critical-fixes-v1.2.1/  # 🆕 v1.2.1 Critical button fixes spec
 ├── .claude/            # Claude Code commands
 ├── docs/               # Project documentation
-│   ├── v1.2.1.md       # 🆕 v1.2.1 Critical Fixes documentation
+│   ├── v1.2.3.md       # 🔮 v1.2.3 TODOs (Google Sheets連携強化)
+│   ├── v1.2.2.md       # 📊 v1.2.2 Session Logging Integration documentation
+│   ├── v1.2.1.md       # 🔧 v1.2.1 Critical Fixes documentation
 │   ├── v1.1.md         # v1.1 Enhancement documentation
+│   ├── session-log-features.md  # Session logging feature details
 │   └── v0_1st_plan.md  # Original planning documents
 ├── engine/             # Core game engine (21 files + v1.2.1 critical fixes)
 ├── stages/             # YAML stage definitions
 ├── tests/              # Comprehensive test suite (26+ files)
 ├── temp/               # Temporary files and screenshots
-├── main.py             # Entry point (v1.2.1 GUI loop fixes)
+├── main.py             # Entry point (v1.2.2 GUI loop fixes + session logging)
 ├── student_example.py  # Student sample code
 ├── run_tests.py        # Pytest integration runner
 ├── conftest.py         # Pytest configuration
@@ -29,7 +32,7 @@ rougelike/
 
 ## Subdirectory Structures
 
-### `/engine/` - Core Game Engine (v1.2.1 - GUI Critical Fixes Complete)
+### `/engine/` - Core Game Engine (v1.2.2 - Session Logging Integration Complete)
 ```
 engine/
 ├── __init__.py                 # Core data models (9,705 bytes)
@@ -132,6 +135,11 @@ Student Code -> API Layer -> Game Engine -> State Update -> Renderer -> Display
 GUI Events -> ExecutionController -> solve() Function Control -> Step Execution
      ↓              ↓                       ↓
 Pause/Resume -> Action History -> Enhanced Session Logging
+
+📊 v1.2.2 Session Logging Integration Flow:
+solve() Execution -> SimpleSessionLogger -> Unified JSON Format -> Stage-specific Directories
+     ↓                       ↓                     ↓                       ↓
+Code Quality Metrics -> Action Count Integration -> data/sessions/stage01/ -> show_session_logs.py
 ```
 
 ## File Naming Conventions
@@ -201,6 +209,14 @@ from engine.renderer import GuiRenderer, CuiRenderer
 - **Execution stability**: Robust continuous and step execution modes
 - **Error resilience**: Improved error handling and recovery mechanisms
 
+### 📊 8. v1.2.2 Session Logging Integration & Data Quality (COMPLETED)
+- **Unified logging architecture**: SimpleSessionLogger integration with structure consistency
+- **Hierarchical data organization**: Stage-specific directory management (`data/sessions/stage01/`)
+- **Code quality automation**: Automatic calculation of lines, comments, and blank lines
+- **Data structure optimization**: Unified JSON format with redundancy elimination  
+- **GUI display optimization**: 900x505px sizing for complete UI element visibility
+- **Educational data insights**: Enhanced metrics for learning pattern analysis
+
 ## Development Workflow
 1. **Stage Design**: Create YAML in `/stages/`
 2. **Engine Updates**: Modify `/engine/` for new features  
@@ -208,9 +224,9 @@ from engine.renderer import GuiRenderer, CuiRenderer
 4. **Student API**: Update `/engine/api.py` if needed
 5. **Documentation**: Update README.md and `/docs/`
 
-## Testing Strategy (v1.2.1 - pytest + GUI Critical Fixes Validated)
-- **Comprehensive Coverage**: 26+ test files covering all 21 engine components (including v1.2.1)
-- **Test Success Rate**: 88.9% (23/26 tests passing) - maintained through v1.2.1 fixes
+## Testing Strategy (v1.2.2 - pytest + Session Logging Integration Validated)
+- **Comprehensive Coverage**: 26+ test files covering all 21 engine components (including v1.2.2)  
+- **Test Success Rate**: 88.9% (23/26 tests passing) - maintained through v1.2.2 integration
 - **pytest Integration**: Full pytest framework with markers and plugins
 - **Test Categories**:
   - Unit tests: Isolated component testing
@@ -219,6 +235,7 @@ from engine.renderer import GuiRenderer, CuiRenderer
   - Session tests: Learning session workflows
   - Google Sheets tests: API integration tests
   - **🔧 v1.2.1 tests**: GUI critical fixes validation, button functionality testing
+  - **📊 v1.2.2 tests**: Session logging integration validation, stage-specific directory testing
 - **Advanced Features**:
   - Test markers: unit/integration/gui classification
   - Failed test analysis and re-run commands
@@ -227,3 +244,4 @@ from engine.renderer import GuiRenderer, CuiRenderer
   - HTML/JSON test reports
 - **Quality Assurance**: Automated quality metrics and test-driven development
 - **🔧 v1.2.1 Test Coverage**: Step/Pause/Reset button functionality, execution controller stability
+- **📊 v1.2.2 Test Coverage**: Session logging structure validation, code quality metrics testing

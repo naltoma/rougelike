@@ -27,12 +27,13 @@ Python初学者向け演習フレームワーク - ローグライク風ステ�
 - **教員支援**: 自動ログ収集・分析による学習状況把握
 - **高度テストシステム**: pytest対応、88.9%成功率、失敗分析・再実行機能
 
-## Current Version: v1.2.1 (GUI Critical Fixes Complete)
-- **コアエンジン**: 21ファイル (拡張) - 完全実装済み + v1.2.1機能
+## Current Version: v1.2.2 (Session Logging Integration Complete)
+- **コアエンジン**: 21ファイル (拡張) - 完全実装済み + v1.2.2機能
 - **テストスイート**: 26ファイル - pytest統合、マーカー対応
 - **品質評価**: 優良⭐ (機能カバレッジ100%, テスト成功率88.9%)
 - **高機能テスト**: 失敗分析、再実行、並列実行、カバレッジ対応
-- **🆕 v1.2.1新機能**: GUI Critical Fixes（Step/Pause/Resetボタンの完全修正）
+- **🆕 v1.2.2新機能**: セッションログ統合・GUI改善（900x505px画面、ステージ別ログ管理、コード品質メトリクス）
+- **📋 v1.2.3予定**: Google Sheets連携強化（学生間進捗共有、タイムスタンプソート機能）
 
 ## Core Implemented Features  
 - GUI（pygame）+ CUI両対応、デフォルトGUI
@@ -63,6 +64,14 @@ Python初学者向け演習フレームワーク - ローグライク風ステ�
 - **Resetボタン包括修正**: システム全体の完全リセット（step_count、アクション履歴含む）
 - **Continue実行最適化**: GUIループ継続条件修正による安定動作
 - **状態管理強化**: ExecutionController状態管理とActionHistoryTrackerの統合改善
+
+## 📊 v1.2.2 Session Logging Integration & GUI Enhancements Features
+- **セッションログ統合実装**: SimpleSessionLogger統合による構造統一とコード品質メトリクス自動計算
+- **ステージ別ログ管理**: `data/sessions/stage01/`形式の階層ディレクトリ構造導入  
+- **GUI画面サイズ最適化**: 900x505px（Player Info凡例完全表示対応）
+- **統合JSON形式**: 1セッション=1JSONファイル（冗長データ削除、構造最適化）
+- **コード品質測定**: 行数、コメント数、空行数の自動計算とaction_count等の統合
+- **show_session_logs.py対応**: 新ログ構造とステージ別ディレクトリ完全対応
 
 ## Advanced Testing Framework
 - **pytest統合**: 高機能テスト実行と分析

@@ -6,13 +6,14 @@
 - **配布方式**: conda環境配布、手動セットアップによる学習効果
 
 ## Frontend
-- **GUI v1.2.1**: pygame（デフォルト表示・実行制御対応・Critical Fixes完了）
+- **GUI v1.2.2**: pygame（デフォルト表示・実行制御対応・Critical Fixes完了・セッションログ統合完了）
   - 2D描画、5x5〜10x10グリッド表示
   - キャラクター・敵・アイテム・壁の視覚化
   - 大型敵（2x2, 3x3）・特殊敵（2x3）対応
   - **🆕 実行制御パネル**: Step/Continue/Pause/Stopボタン
   - **🆕 一時停止機能**: solve()実行前の学習者確認
   - **🆕 キーボードショートカット**: Space/Enter/Esc対応
+  - **🆕 v1.2.2 GUI最適化**: 900x505px画面（Player Info凡例完全表示）
 - **CUI**: テキストベース表示（学習目的・デバッグ用）
   - 同一ロジック、切替可能設計
 - **API設計**: 直感的関数名、向き制御重視
@@ -61,6 +62,18 @@
   - 完全なシステムリセット処理
   - アクション履歴番号の適切なリセット
 
+## 📊 v1.2.2 Backend Session Logging Integration
+- **SimpleSessionLogger統合実装**: session_logging.py統合によるコード品質メトリクス自動計算
+  - action_count、completed_successfully等の重複データ削除
+  - 行数、コメント数、空行数の自動計算機能
+  - 構造統一による一貫性向上
+- **ステージ別ディレクトリ管理**: `data/sessions/stage01/`形式の階層構造導入
+  - SessionLogManagerの再帰検索対応実装
+  - ファイル名解析の`.json`対応（従来は`.jsonl`のみ）
+- **統合JSON形式**: 1セッション=1JSONファイル（冗長データ削除）
+  - total_execution_time削除（ステップ実行では無意味）
+  - データ構造最適化とサイズ削減
+
 ## Development Environment
 - **Python**: 3.8+ 必須
 - **仮想環境**: conda推奨
@@ -90,10 +103,13 @@ conda activate rougelike
 pip install -r requirements.txt
 
 # 実行
-python main.py          # GUI v1.2.1 mode（デフォルト・Critical Fixes完了）
+python main.py          # GUI v1.2.2 mode（デフォルト・Critical Fixes完了・セッションログ統合完了）
 python main.py --cui    # CUI mode
 python main.py --gui    # 明示的GUI指定
 python student_example.py  # 学生サンプル実行
+
+# セッションログ確認（v1.2.2）
+python show_session_logs.py  # ステージ別ディレクトリ対応版
 
 # テスト実行（推奨: pytest統合）
 python run_tests.py     # 高機能実行（失敗分析付き）

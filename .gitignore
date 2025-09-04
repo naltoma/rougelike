@@ -1,3 +1,10 @@
 __pycache__
 .DS_Store
 data/
+
+# OAuth credentials (security sensitive)
+.oauth_credentials/
+*.json
+
+# Google Sheets configuration
+config/google_sheets.json

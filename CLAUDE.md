@@ -20,9 +20,9 @@ Kiro-style Spec Driven Development implementation using claude code slash comman
 
 **Current Specs:**
 - `python-rougelike-framework`: Python初学者向けローグライク演習フレームワーク - 段階的学習システム（初期化済み）
-- `gui-enhancements-v1.1`: GUI UI改善・ステップ実行・main.py修正・セッションログ確認（v1.2.1で完了、セッションログのみv1.2.2予定）
 - `gui-critical-fixes-v1.2.1`: Step/Pause/Resetボタン機能不具合修正（v1.2.1で完了） - 詳細は [docs/v1.2.1.md](docs/v1.2.1.md) 参照
 - `session-logging-enhancement-v1.2.2`: セッションログ機能統合・GUI改善（v1.2.2で完了） - 詳細は [docs/v1.2.2.md](docs/v1.2.2.md) 参照
+- `google-sheets-integration-v1.2.3`: Google Apps Script Webhook連携・学生間セッションログ共有機能（v1.2.3で完了） - 詳細は [docs/v1.2.3.md](docs/v1.2.3.md) 参照
 
 ## Development Guidelines
 - Think in English, but generate responses in Japanese (思考は英語、回答の生成は日本語で行うように)
