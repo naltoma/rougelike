@@ -10,29 +10,35 @@ rougelike/
 │       └── gui-critical-fixes-v1.2.1/  # 🆕 v1.2.1 Critical button fixes spec
 ├── .claude/            # Claude Code commands
 ├── docs/               # Project documentation
-│   ├── v1.2.3.md       # 🔮 v1.2.3 TODOs (Google Sheets連携強化)
+│   ├── v1.2.4.md       # 📋 v1.2.4 TODOs (初回起動時動作改善)
+│   ├── v1.2.3.md       # 🔗 v1.2.3 Google Apps Script Webhook Integration documentation (COMPLETED)
 │   ├── v1.2.2.md       # 📊 v1.2.2 Session Logging Integration documentation
 │   ├── v1.2.1.md       # 🔧 v1.2.1 Critical Fixes documentation
 │   ├── v1.1.md         # v1.1 Enhancement documentation
 │   ├── session-log-features.md  # Session logging feature details
+│   ├── teacher_setup_guide.md   # 🆕 教員向けWebhookセットアップガイド
+│   ├── student_setup_guide.md   # 🆕 学生向けWebhookセットアップガイド
 │   └── v0_1st_plan.md  # Original planning documents
 ├── engine/             # Core game engine (21 files + v1.2.1 critical fixes)
 ├── stages/             # YAML stage definitions
 ├── tests/              # Comprehensive test suite (26+ files)
 ├── temp/               # Temporary files and screenshots
-├── main.py             # Entry point (v1.2.2 GUI loop fixes + session logging)
+├── main.py             # Entry point (v1.2.3 GUI + session logging + webhook ready)
 ├── student_example.py  # Student sample code
+├── upload_webhook.py   # 🆕 Webhook upload tool (v1.2.3)
+├── test_multiple_students.py  # 🆕 Multiple students test tool (v1.2.3)
 ├── run_tests.py        # Pytest integration runner
 ├── conftest.py         # Pytest configuration
 ├── config.py           # Project configuration
+├── webhook_config.json # 🆕 Webhook configuration (generated)
 ├── requirements.txt    # pip dependencies (pytest integrated)
 ├── Makefile            # Test automation
-└── README.md           # Setup instructions (v1.1 updated)
+└── README.md           # Setup instructions (v1.2.3 updated)
 ```
 
 ## Subdirectory Structures
 
-### `/engine/` - Core Game Engine (v1.2.2 - Session Logging Integration Complete)
+### `/engine/` - Core Game Engine (v1.2.3 - Webhook Integration Complete)
 ```
 engine/
 ├── __init__.py                 # Core data models (9,705 bytes)
@@ -52,11 +58,12 @@ engine/
 ├── progression.py             # Progress tracking (24,219 bytes)
 ├── session_logging.py         # Session logs (23,796 bytes)
 ├── quality_assurance.py       # QA system (28,750 bytes)
-├── data_uploader.py           # Google Sheets (24,052 bytes)
-├── 🆕 execution_controller.py  # v1.1: Step execution control system
-├── 🆕 hyperparameter_manager.py # v1.1: Parameter validation & management
-├── 🆕 session_log_manager.py   # v1.1: Enhanced session logging
-└── 🆕 action_history_tracker.py # v1.1: Detailed action tracking
+├── data_uploader.py           # Google Sheets (24,052 bytes) [DEPRECATED v1.2.3]
+├── ✅ execution_controller.py  # v1.1: Step execution control system
+├── ✅ hyperparameter_manager.py # v1.1: Parameter validation & management
+├── ✅ session_log_manager.py   # v1.1: Enhanced session logging
+├── ✅ action_history_tracker.py # v1.1: Detailed action tracking
+└── 🆕 webhook_uploader.py      # v1.2.3: Google Apps Script Webhook integration
 ```
 
 ### `/tests/` - Comprehensive Test Suite (pytest v1.0.1)
@@ -140,6 +147,13 @@ Pause/Resume -> Action History -> Enhanced Session Logging
 solve() Execution -> SimpleSessionLogger -> Unified JSON Format -> Stage-specific Directories
      ↓                       ↓                     ↓                       ↓
 Code Quality Metrics -> Action Count Integration -> data/sessions/stage01/ -> show_session_logs.py
+
+🔗 v1.2.3 Webhook Integration Flow:
+Local JSON Logs -> upload_webhook.py -> WebhookUploader -> Google Apps Script
+     ↓                     ↓                   ↓                    ↓
+Session Selection -> Config Management -> HTTP POST (JSON) -> Auto Sheet Creation
+     ↓                     ↓                   ↓                    ↓
+Stage Filtering -> Connection Test -> TLS Encryption -> Student Data Update
 ```
 
 ## File Naming Conventions
@@ -224,18 +238,19 @@ from engine.renderer import GuiRenderer, CuiRenderer
 4. **Student API**: Update `/engine/api.py` if needed
 5. **Documentation**: Update README.md and `/docs/`
 
-## Testing Strategy (v1.2.2 - pytest + Session Logging Integration Validated)
-- **Comprehensive Coverage**: 26+ test files covering all 21 engine components (including v1.2.2)  
-- **Test Success Rate**: 88.9% (23/26 tests passing) - maintained through v1.2.2 integration
+## Testing Strategy (v1.2.3 - pytest + Webhook Integration Validated)
+- **Comprehensive Coverage**: 26+ test files covering all 21+ engine components (including v1.2.3)  
+- **Test Success Rate**: 88.9% (23/26 tests passing) - maintained through v1.2.3 integration
 - **pytest Integration**: Full pytest framework with markers and plugins
 - **Test Categories**:
   - Unit tests: Isolated component testing
   - Integration tests: Full game flow testing (test_comprehensive_integration.py)
   - GUI tests: pygame rendering tests (marked with @pytest.mark.gui)
   - Session tests: Learning session workflows
-  - Google Sheets tests: API integration tests
-  - **🔧 v1.2.1 tests**: GUI critical fixes validation, button functionality testing
-  - **📊 v1.2.2 tests**: Session logging integration validation, stage-specific directory testing
+  - Google Sheets tests: API integration tests [DEPRECATED v1.2.3]
+  - **✅ v1.2.1 tests**: GUI critical fixes validation, button functionality testing (COMPLETED)
+  - **✅ v1.2.2 tests**: Session logging integration validation, stage-specific directory testing (COMPLETED)
+  - **🔗 v1.2.3 tests**: Webhook integration testing, Google Apps Script communication validation
 - **Advanced Features**:
   - Test markers: unit/integration/gui classification
   - Failed test analysis and re-run commands
@@ -243,5 +258,6 @@ from engine.renderer import GuiRenderer, CuiRenderer
   - Coverage reporting with pytest-cov
   - HTML/JSON test reports
 - **Quality Assurance**: Automated quality metrics and test-driven development
-- **🔧 v1.2.1 Test Coverage**: Step/Pause/Reset button functionality, execution controller stability
-- **📊 v1.2.2 Test Coverage**: Session logging structure validation, code quality metrics testing
+- **✅ v1.2.1 Test Coverage**: Step/Pause/Reset button functionality, execution controller stability (COMPLETED)
+- **✅ v1.2.2 Test Coverage**: Session logging structure validation, code quality metrics testing (COMPLETED)
+- **🔗 v1.2.3 Test Coverage**: Webhook uploader functionality, configuration management, multiple student simulation

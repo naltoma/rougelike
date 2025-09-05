@@ -25,6 +25,12 @@ from engine.session_log_manager import SessionLogManager, LoggingSystemError
 from engine import StepPauseException
 from engine.solve_parser import parse_solve_function
 
+# v1.2.4新機能: 初回確認モード統合
+from engine.initial_confirmation_flag_manager import InitialConfirmationFlagManager
+from engine.stage_description_renderer import StageDescriptionRenderer
+from engine.conditional_session_logger import ConditionalSessionLogger
+from engine.stage_loader import StageLoader
+
 # ロギング設定
 logging.basicConfig(
     level=logging.INFO,
@@ -38,6 +44,12 @@ execution_controller = ExecutionController()
 hyperparameter_manager = HyperParameterManager()
 session_log_manager = SessionLogManager()
 solve_parser = None  # 動的solve()解析用
+
+# v1.2.4新機能: 初回確認モード管理インスタンス
+confirmation_flag_manager = InitialConfirmationFlagManager(hyperparameter_manager)
+stage_loader = StageLoader()
+stage_description_renderer = StageDescriptionRenderer(stage_loader)
+conditional_session_logger = ConditionalSessionLogger(session_log_manager)
 
 def setup_stage(stage_id: str, student_id: str):
     """
@@ -181,7 +193,7 @@ STAGE_ID = "stage01"  # 実行するステージ（stage01, stage02, ...）
 STUDENT_ID = "123456A"  # テスト用ID
 
 # ログ設定
-ENABLE_LOGGING = True  # セッションログを有効化
+ENABLE_LOGGING = False  # セッションログを有効化
 
 # ================================
 
@@ -224,6 +236,79 @@ def solve():
     turn_right()  # 南を向く
     for _ in range(4):
         move()    # 南に移動
+
+def setup_confirmation_mode(stage_id: str, student_id: str) -> bool:
+    """
+    v1.2.4新機能: 初回確認モード判定ロジック
+    
+    Args:
+        stage_id: ステージID
+        student_id: 学生ID
+    
+    Returns:
+        bool: True=確認モード表示完了, False=確認モードスキップ
+    """
+    try:
+        # 初回実行判定
+        is_first_time = confirmation_flag_manager.is_first_execution(stage_id, student_id)
+        confirmation_mode = confirmation_flag_manager.get_confirmation_mode()
+        logging_enabled = hyperparameter_manager.is_logging_enabled()
+        
+        # 確認モード条件: 初回実行 AND 確認モード(False) AND ログ無効(False)
+        if is_first_time and not confirmation_mode and not logging_enabled:
+            # 初回実行かつ確認モード(False)かつログ無効の場合：ステージ説明を表示
+            print("\n" + "="*80)
+            print("🔰 初回実行検出：ステージ理解モード")
+            print("="*80)
+            print("このステージを初めて実行します。")
+            print("まずはステージの内容を理解してからコードを書きましょう。")
+            print()
+            
+            # ステージ説明表示
+            try:
+                stage_description = stage_description_renderer.display_stage_conditions(
+                    stage_id, student_id
+                )
+                print(stage_description)
+            except Exception as e:
+                logger.error(f"ステージ説明表示エラー: {e}")
+                # フォールバック表示
+                fallback_description = stage_description_renderer.display_fallback_message(stage_id)
+                print(fallback_description)
+            
+            # 表示済みマークを設定
+            confirmation_flag_manager.mark_stage_intro_displayed(stage_id)
+            
+            print("\n💡 次回実行時のヒント:")
+            print("ステージ内容を理解したら、実行モードに切り替えてください。")
+            print("実行モードでは学習データ(セッションログ)が記録されます。")
+            print()
+            print("🔧 実行モードへの切り替え方法:")
+            print("ハイパーパラメータ設定で ENABLE_LOGGING = True に設定")
+            print()
+            
+            return True
+            
+        elif not confirmation_mode:
+            # 再実行だが確認モード：短いメッセージ
+            print(f"\n🔰 確認モード実行: {stage_id}")
+            print("セッションログは記録されません（学習データ収集を除外）")
+            print("実行モードに切り替えると学習データが記録されます")
+            print()
+            return False
+            
+        else:
+            # 実行モード：通常のログ記録実行
+            print(f"\n🚀 実行モード: {stage_id}")
+            print("セッションログを記録し、学習データを収集します")
+            print()
+            return False
+            
+    except Exception as e:
+        logger.error(f"確認モード設定中にエラー: {e}")
+        print(f"⚠️ 確認モード設定エラー: {e}")
+        print("通常モードで続行します")
+        return False
 
 def validate_hyperparameters():
     """
@@ -343,58 +428,123 @@ def main():
     student_id = hyperparameter_manager.get_student_id()
     logging_enabled = hyperparameter_manager.is_logging_enabled()
     
-    # セッションログ有効化（要求仕様4.1）
+    # v1.2.4新機能: 初回確認モード判定処理
+    print("🔰 初回確認モードを確認中...")
+    confirmation_mode_displayed = setup_confirmation_mode(stage_id, student_id)
+    
+    # v1.2.4新機能: 確認モード時の処理フラグ
+    is_confirmation_mode = confirmation_mode_displayed
+    
+    # v1.2.4新機能: 条件付きセッションログ有効化
+    # ログ有効時は実行モード、無効時は確認モードとして動作
+    actual_execution_mode = logging_enabled
+    
     if logging_enabled:
         try:
             print("📝 セッションログシステムを初期化中...")
-            result = session_log_manager.enable_default_logging(student_id, stage_id)
-            if result.success:
-                print(f"✅ セッションログ有効化完了")
-                print(f"📂 ログファイル: {result.log_path}")
-                
-                # solve()関数のソースコード取得
-                solve_code = _get_solve_function_code()
-                
-                # セッション情報を設定（コード含む）
-                if session_log_manager.session_logger:
-                    session_log_manager.session_logger.set_session_info(
-                        stage_id=stage_id, 
-                        solve_code=solve_code
-                    )
-                    session_log_manager.session_logger.log_event("session_start", {
-                        "display_mode": display_mode,
-                        "framework_version": "v1.2.2",
-                        "stage_id": stage_id,
-                        "student_id": student_id
-                    })
+            
+            # 実行モードでのログ記録
+            log_start_result = conditional_session_logger.conditional_log_start(
+                actual_execution_mode,
+                display_mode=display_mode,
+                framework_version="v1.2.4",
+                stage_id=stage_id,
+                student_id=student_id
+            )
+            
+            if log_start_result:
+                # 実行モード：通常通りログを有効化
+                result = session_log_manager.enable_default_logging(student_id, stage_id)
+                if result.success:
+                    print(f"✅ 実行モード：セッションログ有効化完了")
+                    print(f"📂 ログファイル: {result.log_path}")
+                    
+                    # solve()関数のソースコード取得
+                    solve_code = _get_solve_function_code()
+                    
+                    # セッション情報を設定（コード含む）
+                    if session_log_manager.session_logger:
+                        session_log_manager.session_logger.set_session_info(
+                            stage_id=stage_id, 
+                            solve_code=solve_code
+                        )
+                else:
+                    print(f"⚠️ ログシステム初期化警告: {result.error_message}")
+                    print("ログなしで実行を継続します")
             else:
-                print(f"⚠️ ログシステム初期化警告: {result.error_message}")
-                print("ログなしで実行を継続します")
+                # 確認モード：セッションログを除外
+                print("🔰 確認モード：セッションログ記録を除外します")
+                mode_status = conditional_session_logger.get_current_mode_status()
+                print(f"📊 現在のモード: {mode_status['mode_description']}")
+                print(f"📝 ログ動作: {mode_status['log_behavior']}")
+                
         except LoggingSystemError as e:
             print(f"⚠️ ログシステム初期化警告: {e}")
             print("ログなしで実行を継続します")
     
-    logger.info(f"ローグライク演習フレームワーク開始")
-    logger.info(f"表示モード: {display_mode.upper()}")
-    logger.info(f"ステージ: {stage_id}")
-    logger.info(f"学生ID: {student_id}")
+    # v1.2.4新機能: 確認モード時は最小限のGUI初期化のみ実行
+    if not is_confirmation_mode:
+        logger.info(f"ローグライク演習フレームワーク開始")
+        logger.info(f"表示モード: {display_mode.upper()}")
+        logger.info(f"ステージ: {stage_id}")
+        logger.info(f"学生ID: {student_id}")
+        
+        print("🎮 ローグライク演習フレームワーク")
+        print(f"📺 表示モード: {display_mode.upper()}")
+        print(f"🎯 ステージ: {stage_id}")
+        print(f"👤 学生ID: {student_id}")
+        print()
+        print("🔥 ゲームエンジン実装完了！")
+        print("solve()関数を編集してゲームを攻略してください！")
     
-    print("🎮 ローグライク演習フレームワーク")
-    print(f"📺 表示モード: {display_mode.upper()}")
-    print(f"🎯 ステージ: {stage_id}")
-    print(f"👤 学生ID: {student_id}")
-    print()
-    print("🔥 ゲームエンジン実装完了！")
-    print("solve()関数を編集してゲームを攻略してください！")
-    
-    # ステージ初期化と初期状態表示（solve()実行前）
+    # ステージ初期化と初期状態表示（GUI描画に必須）
     if not setup_stage(stage_id, student_id):
         print("❌ ステージのセットアップに失敗しました")
         sys.exit(1)
         
     show_initial_state()
     
-    # solve()関数解析の初期化
+    # 確認モード時はここで一時停止
+    if is_confirmation_mode:
+        print("\n" + "="*80)
+        print("📚 ステージ理解完了")
+        print("="*80)
+        print("ステージの内容と攻略方法を理解できましたか？")
+        print("理解できたら、上記の切り替え方法で実行モードに変更して再実行してください。")
+        print("\n⏸️ 確認完了後、Escapeキーまたは×ボタンでプログラムを終了してください")
+        print("（確認モードではsolve()は実行されません）")
+        
+        # GUI表示のためのメインループ開始
+        from engine.api import _global_api
+        import pygame
+        import time
+        
+        while True:
+            # pygameイベント処理
+            if hasattr(_global_api, 'renderer') and _global_api.renderer:
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        return
+                    elif event.type == pygame.KEYDOWN:
+                        if event.key == pygame.K_ESCAPE:
+                            print("⏹️ 確認モード終了")
+                            return
+                        else:
+                            print("📚 確認モードではsolve()は実行されません")
+                            print("実行モードに変更してから再実行してください")
+            
+            # GUI描画更新
+            if hasattr(_global_api, 'renderer') and _global_api.renderer and _global_api.game_manager:
+                try:
+                    game_state = _global_api.game_manager.get_current_state()
+                    _global_api.renderer.render_frame(game_state)
+                    _global_api.renderer.update_display()
+                except Exception as render_error:
+                    print(f"⚠️ 描画エラー: {render_error}")
+            
+            time.sleep(0.016)  # 約60FPS
+    
+    # 実行モード時のsolve()関数解析
     print("\n🔍 solve()関数を解析中...")
     if not _initialize_solve_parser():
         print("⚠️ solve()解析に失敗しましたが、継続します")
@@ -409,7 +559,7 @@ def main():
                 print(f"   ... 他 {len(summary) - 10} ステップ")
     
     try:
-        # solve()実行前の一時停止（要求仕様1.1）
+        # solve()実行前の一時停止（要求仕様1.1） - 実行モードのみ
         print("\n⏸️ solve()実行準備完了")
         print("GUIのStepボタンまたはスペースキーを押してsolve()を開始してください")
         execution_controller.pause_before_solve()
@@ -449,19 +599,27 @@ def main():
                             return
                         elif event.type == pygame.KEYDOWN:
                             if event.key == pygame.K_SPACE:
-                                print("🔍 スペースキー検出 - ステップ実行")
-                                try:
-                                    step_result = execution_controller.step_execution()
-                                    if step_result and not step_result.success:
-                                        print(f"⚠️ ステップ実行エラー: {step_result.error_message}")
-                                except Exception as e:
-                                    print(f"❌ ステップ実行例外: {e}")
+                                if is_confirmation_mode:
+                                    print("📚 確認モードではsolve()は実行されません")
+                                    print("実行モードに変更してから再実行してください")
+                                else:
+                                    print("🔍 スペースキー検出 - ステップ実行")
+                                    try:
+                                        step_result = execution_controller.step_execution()
+                                        if step_result and not step_result.success:
+                                            print(f"⚠️ ステップ実行エラー: {step_result.error_message}")
+                                    except Exception as e:
+                                        print(f"❌ ステップ実行例外: {e}")
                             elif event.key == pygame.K_RETURN:
-                                print("▶️ Enterキー検出 - 連続実行")
-                                try:
-                                    execution_controller.continuous_execution()
-                                except Exception as e:
-                                    print(f"❌ 連続実行例外: {e}")
+                                if is_confirmation_mode:
+                                    print("📚 確認モードではsolve()は実行されません")
+                                    print("実行モードに変更してから再実行してください")
+                                else:
+                                    print("▶️ Enterキー検出 - 連続実行")
+                                    try:
+                                        execution_controller.continuous_execution()
+                                    except Exception as e:
+                                        print(f"❌ 連続実行例外: {e}")
                             elif event.key == pygame.K_ESCAPE:
                                 print("⏹️ Escapeキー検出 - 停止")
                                 try:
@@ -487,7 +645,12 @@ def main():
                         elif event.type == pygame.MOUSEBUTTONDOWN:
                             # ボタンクリック処理
                             if hasattr(_global_api.renderer, '_handle_control_events'):
-                                _global_api.renderer._handle_control_events(event)
+                                if is_confirmation_mode:
+                                    # 確認モードでは実行系ボタンを無効化
+                                    print("📚 確認モードではsolve()実行ボタンは無効です")
+                                    print("実行モードに変更してから再実行してください")
+                                else:
+                                    _global_api.renderer._handle_control_events(event)
             
             # GUI描画更新
             if hasattr(_global_api, 'renderer') and _global_api.renderer and _global_api.game_manager:
@@ -644,8 +807,8 @@ def main():
         # 結果表示（solve()完了後の処理）
         show_results()
         
-        # セッション完了ログ記録（要求仕様4.4）
-        if logging_enabled and session_log_manager.enabled and session_log_manager.session_logger:
+        # v1.2.4新機能: 条件付きセッション完了ログ記録
+        if logging_enabled:
             try:
                 # 実際のゲーム結果を確認
                 from engine.api import _global_api, get_game_result
@@ -663,15 +826,27 @@ def main():
                 except Exception as e:
                     print(f"⚠️ ゲーム結果確認エラー: {e}")
                 
+                # 条件付きセッション終了ログ記録
                 execution_summary = {
                     "completed_successfully": game_completed,
                     "total_execution_time": "N/A",  # 実際の計測は今後実装
                     "action_count": actual_action_count
                 }
-                session_log_manager.session_logger.log_event("session_complete", execution_summary)
-                print("\n📝 セッション完了ログを記録しました")
+                
+                log_end_result = conditional_session_logger.conditional_log_end(
+                    actual_execution_mode,
+                    **execution_summary
+                )
+                
+                if log_end_result:
+                    print("\n📝 実行モード：セッション完了ログを記録しました")
+                else:
+                    print("\n🔰 確認モード：セッション完了ログを除外しました")
+                    
             except LoggingSystemError as e:
                 print(f"⚠️ セッション完了ログ記録エラー: {e}")
+            except Exception as e:
+                print(f"⚠️ セッションログ終了処理エラー: {e}")
         
         # ログファイルの場所とアクセス方法を表示
         if logging_enabled and session_log_manager.enabled:

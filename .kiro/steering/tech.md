@@ -6,14 +6,14 @@
 - **配布方式**: conda環境配布、手動セットアップによる学習効果
 
 ## Frontend
-- **GUI v1.2.2**: pygame（デフォルト表示・実行制御対応・Critical Fixes完了・セッションログ統合完了）
+- **GUI v1.2.3**: pygame（デフォルト表示・実行制御対応・Critical Fixes完了・セッションログ統合完了・Webhook連携対応）
   - 2D描画、5x5〜10x10グリッド表示
   - キャラクター・敵・アイテム・壁の視覚化
   - 大型敵（2x2, 3x3）・特殊敵（2x3）対応
-  - **🆕 実行制御パネル**: Step/Continue/Pause/Stopボタン
-  - **🆕 一時停止機能**: solve()実行前の学習者確認
-  - **🆕 キーボードショートカット**: Space/Enter/Esc対応
-  - **🆕 v1.2.2 GUI最適化**: 900x505px画面（Player Info凡例完全表示）
+  - **✅ 実行制御パネル**: Step/Continue/Pause/Stopボタン（v1.2.1で安定化完了）
+  - **✅ 一時停止機能**: solve()実行前の学習者確認
+  - **✅ キーボードショートカット**: Space/Enter/Esc対応
+  - **✅ GUI最適化**: 900x505px画面（Player Info凡例完全表示、v1.2.2で完了）
 - **CUI**: テキストベース表示（学習目的・デバッグ用）
   - 同一ロジック、切替可能設計
 - **API設計**: 直感的関数名、向き制御重視
@@ -31,7 +31,7 @@
   - json, csv（ログ出力）
   - yaml（ステージ定義読込）
   - hashlib（コードハッシュ）
-- **API連携**: Google Sheets API（ログ送信）
+- **API連携**: Google Apps Script Webhook（ログ送信、v1.2.3で完了）
 
 ## 🆕 v1.1 Backend Components
 - **実行制御システム**: ExecutionController
@@ -74,6 +74,24 @@
   - total_execution_time削除（ステップ実行では無意味）
   - データ構造最適化とサイズ削減
 
+## 🔗 v1.2.3 Google Apps Script Webhook Integration Components (COMPLETED)
+- **WebhookUploader**: Google Apps Script Webhook送信機能
+  - HTTP POST通信による無料Webhook連携
+  - JSON形式データ送信（v1.2.2互換）
+  - 接続テスト・エラーハンドリング機能
+- **WebhookConfigManager**: 設定管理システム
+  - webhook_config.json自動生成・管理
+  - 初回セットアップウィザード機能
+  - 設定状態確認・バリデーション
+- **SessionLogLoader**: ログファイル読み込み機能
+  - ステージ別ディレクトリ対応（data/sessions/stage01/）
+  - 複数セッション選択・フィルタリング機能
+  - コード品質メトリクス統合読み込み
+- **Google Apps Script (Code.gs)**: サーバーサイド処理
+  - ステージ別シート自動作成・管理
+  - 同一学生データ自動上書き機能
+  - 共有フォルダ配置・権限管理
+
 ## Development Environment
 - **Python**: 3.8+ 必須
 - **仮想環境**: conda推奨
@@ -103,13 +121,20 @@ conda activate rougelike
 pip install -r requirements.txt
 
 # 実行
-python main.py          # GUI v1.2.2 mode（デフォルト・Critical Fixes完了・セッションログ統合完了）
+python main.py          # GUI v1.2.3 mode（デフォルト・Critical Fixes完了・セッションログ統合完了・Webhook対応）
 python main.py --cui    # CUI mode
 python main.py --gui    # 明示的GUI指定
 python student_example.py  # 学生サンプル実行
 
 # セッションログ確認（v1.2.2）
 python show_session_logs.py  # ステージ別ディレクトリ対応版
+
+# Google Sheets Webhook連携（v1.2.3新機能）
+python upload_webhook.py --setup      # 初回セットアップ
+python upload_webhook.py stage01      # ステージログアップロード
+python upload_webhook.py --test       # 接続テスト
+python upload_webhook.py --status     # 設定状態確認
+python test_multiple_students.py "https://..." stage01 -n 10  # 複数学生テスト
 
 # テスト実行（推奨: pytest統合）
 python run_tests.py     # 高機能実行（失敗分析付き）
@@ -130,7 +155,8 @@ make test-parallel      # 並列実行
 - `STUDENT_ID`: 6桁数字+英大文字1桁
 - `PERFORMED_DATE`: YYYY-MM-DD形式（遅延判定用）
 - `COLLABORATORS`: カンマ区切り学籍番号
-- `GOOGLE_SHEETS_URL`: 送信先シートURL（教員設定）
+- `WEBHOOK_URL`: Google Apps Script WebhookエンドポイントURL（v1.2.3）
+- `SHARED_FOLDER_URL`: Google Drive共有フォルダURL（オプション、v1.2.3）
 
 ## Port Configuration
 - **開発時**: なし（スタンドアロン実行）
@@ -151,14 +177,28 @@ make test-parallel      # 並列実行
         ..G..
   api: {allowed: [turn_left, turn_right, move]}
   ```
-- **ログ出力**: JSONL
+- **ログ出力**: JSON（v1.2.2統合形式）
   ```json
   {"timestamp": "2024-08-30T14:39:00", "student_id": "123456A", "stage_id": "stage01", "turns": 5, "attempts": 3, "result": "pass"}
+  ```
+- **Webhookデータ**: JSON（v1.2.3形式）
+  ```json
+  {
+    "student_id": "123456A",
+    "stage_id": "stage01", 
+    "end_time": "2025-09-04T19:30:00",
+    "solve_code": "def solve(): ...",
+    "completed_successfully": true,
+    "action_count": 10,
+    "code_lines": 25
+  }
   ```
 
 ## Security Considerations
 - **認証**: 学籍番号ベース、匿名化なし
 - **データ保護**: ローカル実行、最小限の外部通信
+- **Webhook通信**: HTTPS/TLS暗号化通信（v1.2.3）
+- **Google Apps Script**: 実行権限のみ（OAuth2認証不要）
 - **不正対策**: 将来実装（コード類似度検出、制限時間等）
 - **プライバシー**: 学内ドメイン限定公開
 

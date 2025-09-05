@@ -3,8 +3,8 @@
 HyperParameterManager - ステージID、学生ID、ログ設定の管理
 """
 
-from dataclasses import dataclass
-from typing import Optional, Any
+from dataclasses import dataclass, field
+from typing import Optional, Any, Dict
 from pathlib import Path
 import logging
 
@@ -17,12 +17,22 @@ class HyperParametersData:
     student_id: Optional[str] = None
     log_enabled: bool = True
     
+    # v1.2.4新機能: 初回確認モード関連フィールド
+    initial_confirmation_mode: bool = False  # False=確認モード, True=実行モード
+    stage_intro_displayed: Dict[str, bool] = field(default_factory=dict)
+    
     def __post_init__(self):
         """バリデーション"""
         if not self.stage_id:
             raise ValueError("ステージIDは必須です")
         if self.student_id is not None and not self.student_id:
             raise ValueError("学生IDが空文字です")
+        
+        # v1.2.4: 初回確認モード関連フィールドのバリデーション
+        if not isinstance(self.initial_confirmation_mode, bool):
+            raise ValueError("initial_confirmation_modeはbool型である必要があります")
+        if not isinstance(self.stage_intro_displayed, dict):
+            raise ValueError("stage_intro_displayedはdict型である必要があります")
 
 class HyperParameterError(Exception):
     """ハイパーパラメータ関連のエラー"""

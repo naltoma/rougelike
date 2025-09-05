@@ -38,3 +38,7 @@ MAX_CODE_SIZE_KB = 32
 # 遅延提出判定時刻（日本時間）
 DEADLINE_HOUR = 11
 DEADLINE_MINUTE = 50
+
+# v1.2.4新機能: 初回確認モード設定
+INITIAL_CONFIRMATION_MODE_DEFAULT = False  # デフォルトは確認モード
+STAGE_DESCRIPTION_MAX_WIDTH = 80  # ステージ説明文の最大幅

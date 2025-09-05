@@ -23,6 +23,7 @@ Kiro-style Spec Driven Development implementation using claude code slash comman
 - `gui-critical-fixes-v1.2.1`: Step/Pause/Resetボタン機能不具合修正（v1.2.1で完了） - 詳細は [docs/v1.2.1.md](docs/v1.2.1.md) 参照
 - `session-logging-enhancement-v1.2.2`: セッションログ機能統合・GUI改善（v1.2.2で完了） - 詳細は [docs/v1.2.2.md](docs/v1.2.2.md) 参照
 - `google-sheets-integration-v1.2.3`: Google Apps Script Webhook連携・学生間セッションログ共有機能（v1.2.3で完了） - 詳細は [docs/v1.2.3.md](docs/v1.2.3.md) 参照
+- `initial-execution-behavior-v1.2.4`: 初回起動時動作改善 - ステージクリア条件確認・試行回数管理最適化（初期化済み） - 詳細は [docs/v1.2.4.md](docs/v1.2.4.md) 参照
 
 ## Development Guidelines
 - Think in English, but generate responses in Japanese (思考は英語、回答の生成は日本語で行うように)
