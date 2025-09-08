@@ -1,13 +1,13 @@
 # Python初学者向けローグライク演習フレームワーク
 
-[![Version](https://img.shields.io/badge/version-v1.2.3-blue.svg)](VERSION_HISTORY.md)
+[![Version](https://img.shields.io/badge/version-v1.2.5-blue.svg)](VERSION_HISTORY.md)
 [![Python](https://img.shields.io/badge/python-3.8+-green.svg)](https://python.org)
 [![Tests](https://img.shields.io/badge/tests-88.9%25-brightgreen.svg)](#🧪-テスト実行)
 [![Quality](https://img.shields.io/badge/quality-優良⭐-gold.svg)](#📈-品質メトリクス)
 
 Python初学者のための教育用ローグライクゲームフレームワークです。体験的なプログラミング学習を通じて、基礎的なプログラミングスキルを習得できます。
 
-> **🔗 v1.2.3 Google Sheets連携完了！** 無料Google Apps Script Webhook方式で簡単セットアップを実現 - 詳細は [VERSION_HISTORY.md](VERSION_HISTORY.md) をご覧ください
+> **⚡ v1.2.5 7段階速度制御完了！** Continue実行をx1〜x50で調整可能・超高速デバッグ対応 - 詳細は [VERSION_HISTORY.md](VERSION_HISTORY.md) をご覧ください
 
 ## 🎯 特徴
 
@@ -16,6 +16,7 @@ Python初学者のための教育用ローグライクゲームフレームワ�
 - **無限ループ自動検出**: 初学者が陥りやすい問題を早期発見
 - **段階的ヒントシステム**: 学習者の進度に応じた適応的支援
 - **個別学習プロファイル**: 学習者の特性を分析・最適化
+- **⚡ 7段階速度制御**: x1〜x50でContinue実行速度を調整・デバッグ効率向上
 
 ### 📊 教師支援機能
 - **リアルタイム学習データ収集**: 学習者の行動を詳細記録
@@ -50,7 +51,11 @@ rougelike/
 │   ├── enemy_system.py      # 敵システム
 │   ├── item_system.py       # アイテムシステム
 │   ├── advanced_game_state.py # 拡張ゲーム状態
-│   └── main_game_loop.py    # メインループ
+│   ├── main_game_loop.py    # メインループ
+│   ├── enhanced_7stage_speed_control_manager.py # ⚡ 7段階速度制御
+│   ├── ultra_high_speed_controller.py # 超高速制御
+│   ├── speed_control_error_handler.py # 速度制御エラー処理
+│   └── enhanced_7stage_speed_errors.py # 速度制御例外
 ├── stages/                  # ステージファイル
 ├── tests/                   # テストスイート
 ├── data/                    # データ保存
@@ -87,6 +92,23 @@ if game.is_game_finished():
     result = game.get_game_result()
     print(f"ゲーム結果: {result}")
 ```
+
+### ⚡ 7段階速度制御機能 (v1.2.5)
+
+GUIの **Execution Control** パネルで、Continue実行の速度を調整できます：
+
+- **x1** (2.0秒) - 学習モード（ゆっくりと理解）
+- **x2** (1.0秒) - 標準速度（デフォルト）
+- **x3** (0.5秒) - 2倍速相当
+- **x4** (0.25秒) - 4倍速
+- **x5** (0.1秒) - 10倍速
+- **x10** (0.05秒) - 超高速
+- **x50** (0.001秒) - 最高速度（デバッグ用）
+
+**使用例：**
+1. **学習時**: x1でアルゴリズムを詳細確認
+2. **デバッグ時**: x50で問題箇所を高速特定
+3. **実演時**: x3〜x5で適度な速度で説明
 
 ### 学習支援機能
 
@@ -181,9 +203,25 @@ pytest統合実行では以下の機能を提供：
    pytest tests/test_renderer.py -v
 ```
 
-## 📊 Google Sheets連携設定
+## 🔗 主要機能
 
-**v1.2.3 新機能**: 無料Google Apps Script Webhook連携
+### ⚡ 7段階速度制御システム (v1.2.5 新機能)
+Continue実行の速度をリアルタイムで調整可能：
+
+#### 教育効果
+- **x1**: 初学者向け詳細確認モード
+- **x2**: デフォルト標準速度
+- **x3-x5**: 実演・説明に最適
+- **x10-x50**: デバッグ・高速検証
+
+#### 技術仕様
+- 高精度スリープ制御（1ms精度）
+- リアルタイム速度変更
+- 超高速実行対応（視認不可レベル）
+
+### 📊 Google Sheets連携設定
+
+**v1.2.3**: 無料Google Apps Script Webhook連携
 
 ### 🚀 教員向けセットアップ（5分）
 1. **Google Apps Script設定**

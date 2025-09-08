@@ -291,26 +291,43 @@ class GuiRenderer(Renderer):
         self.show_coordinates = False
         self.debug_mode = False
         
-        # 実行制御UIの設定（v1.1新機能）
-        self.control_panel_height = 55  # パネル高さを1行分に調整（85→55）
-        self.button_width = 55  # ボタン幅を+5px増加（50→55）
-        self.button_height = 22 # ボタン高さ
-        self.button_margin = 6  # ボタン間隔
+        # 🚀 v1.2.5: 7段階速度制御対応UI設定
+        self.control_panel_height = 90  # 3段構成に拡張（55→90）
+        self.button_width = 50  # Continueボタン文字収容のため+5px拡張（45→50）
+        self.button_height = 25 # ボタン高さを少し拡大（22→25）
+        self.button_margin = 5  # ボタン間隔を縮小（6→5）
+        self.speed_button_width = 40  # 速度ボタン専用幅
+        self.speed_button_height = 20 # 速度ボタン専用高さ
         
-        # ボタンの色定義
+        # ボードサイズ変更対応のための追加マージン
+        self.dynamic_margin_bottom = 10  # 情報パネルとの最小間隔
+        
+        # 🚀 v1.2.5: 7段階速度制御対応ボタン色定義
         self.button_colors = {
             'step': (100, 180, 100),        # 緑（ステップ実行）
             'continue': (100, 150, 255),    # 青（連続実行）
             'pause': (255, 150, 100),       # オレンジ（一時停止）
             'stop': (255, 100, 100),        # 赤（停止）
-            'speed': (200, 200, 100),       # 黄（速度調整）
+            'reset': (150, 150, 255),       # ライトブルー（リセット）
+            'exit': (200, 100, 100),        # ライトレッド（終了）
+            'speed_standard': (200, 200, 100),    # 黄（標準速度 x1-x5）
+            'speed_ultra': (255, 165, 0),         # オレンジ（超高速 x10, x50）
+            'speed_selected': (255, 215, 0),      # 金色（選択中速度）
             'disabled': (150, 150, 150),    # グレー（無効）
             'button_text': (255, 255, 255), # 白（ボタンテキスト）
+            'button_text_dark': (0, 0, 0),  # 黒（濃いボタン用テキスト）
         }
         
         # 実行制御コールバック
         self.execution_controller = None
         self.button_rects = {}  # ボタン矩形管理
+        
+        # 🚀 v1.2.5: 7段階速度制御システム
+        self._7stage_speed_manager = None
+        self._ultra_speed_controller = None
+        self.current_speed_multiplier = 2  # デフォルトをx2に変更
+        self.speed_button_rects = {}  # 速度ボタン矩形管理
+        self.speed_warning_display = False  # 超高速警告表示フラグ
         
         # レイアウト制約管理（v1.2新機能）
         self.layout_constraint_manager = LayoutConstraintManager()
@@ -322,6 +339,20 @@ class GuiRenderer(Renderer):
         self._buttons_registered = False
         
         print("🎮 GUIレンダラー初期化完了（実行制御UI・レイアウト制約管理・イベント処理エンジン対応）")
+    
+    def setup_7stage_speed_control(self, speed_manager, ultra_controller):
+        """
+        7段階速度制御システム統合
+        
+        Args:
+            speed_manager: Enhanced7StageSpeedControlManager
+            ultra_controller: UltraHighSpeedController
+        """
+        self._7stage_speed_manager = speed_manager
+        self._ultra_speed_controller = ultra_controller
+        if speed_manager:
+            self.current_speed_multiplier = speed_manager.get_current_speed_multiplier()
+        print("✅ GUI: 7段階速度制御システム統合完了")
     
     def initialize(self, width: int, height: int) -> None:
         """GUIレンダラーを初期化"""
@@ -392,8 +423,11 @@ class GuiRenderer(Renderer):
         # 下部情報エリアの描画
         self._draw_info_area(game_state)
         
-        # 実行制御パネルの描画（v1.1新機能）
+        # 実行制御パネルの描画（v1.2.5: 7段階速度制御対応）
         self._draw_control_panel()
+        
+        # 🚀 v1.2.5: 7段階速度表示更新
+        self.update_7stage_speed_display()
         
         # イベント処理
         self._handle_events()
@@ -787,29 +821,35 @@ class GuiRenderer(Renderer):
             print("🔧 EventProcessingEngineにExecutionController連携完了")
     
     def _draw_control_panel(self) -> None:
-        """実行制御パネルを描画"""
+        """🚀 v1.2.5: 3段構成拡張実行制御パネルを描画"""
         if not self.screen:
             return
         
-        # パネル領域の計算（400px幅に調整、上部に配置）
-        panel_y = self.margin  # 上部に配置
-        panel_width = 400  # 情報パネルと同じ400px幅
+        # パネル領域の計算（幅を拡大して7ボタン対応）
+        panel_y = self.margin
+        panel_width = 500  # 7ボタン対応で幅を拡大（400→500）
         
         # パネル背景（サイドバーの右側に配置）
-        control_x = self.margin + self.sidebar_width + self.margin  # サイドバーの右側
+        control_x = self.margin + self.sidebar_width + self.margin
         panel_rect = pygame.Rect(control_x, panel_y, panel_width, self.control_panel_height)
         pygame.draw.rect(self.screen, (230, 230, 230), panel_rect)
         pygame.draw.rect(self.screen, (180, 180, 180), panel_rect, 2)
         
-        # タイトル
-        title_text = self.font.render("Execution Control", True, self.colors['text'])
+        # 🚀 v1.2.5: 3段構成レイアウト
+        self._draw_enhanced_3tier_control_panel(control_x, panel_y, panel_width)
+    
+    def _draw_enhanced_3tier_control_panel(self, control_x: int, panel_y: int, panel_width: int) -> None:
+        """🚀 v1.2.5: 3段構成拡張コントロールパネル描画"""
+        
+        # Tier 1: パネル名表示
+        title_text = self.font.render("🚀 Execution Control v1.2.5", True, self.colors['text'])
         self.screen.blit(title_text, (control_x + 10, panel_y + 5))
         
-        # ボタン配置（1行レイアウト、横一列配置）
-        button_y = panel_y + 25  # 1行のみ
+        # Tier 2: 実行制御ボタン（既存）
+        button_y = panel_y + 28
         button_x_start = control_x + 10
         
-        # 5つのボタンを横一列に配置
+        # 5つの実行制御ボタン
         step_rect = self._draw_button(button_x_start, button_y, "Step", 'step')
         continue_rect = self._draw_button(button_x_start + (self.button_width + self.button_margin) * 1, 
                                         button_y, "Continue", 'continue')
@@ -820,41 +860,120 @@ class GuiRenderer(Renderer):
         exit_rect = self._draw_button(button_x_start + (self.button_width + self.button_margin) * 4, 
                                     button_y, "Exit", 'exit')
         
-        # ボタン矩形を記録（クリック判定用）
+        # 基本ボタン矩形記録
         self.button_rects = {
             'step': step_rect,
-            'continue': continue_rect,
+            'continue': continue_rect,  
             'pause': pause_rect,
             'reset': reset_rect,
             'exit': exit_rect
         }
         
-        # ボタン登録は初回のみ実行（EventProcessingEngine）
-        self._register_buttons_once(step_rect, continue_rect, pause_rect, reset_rect, exit_rect)
+        # Tier 3: 7段階速度制御ボタン
+        speed_y = panel_y + 55
+        self._draw_7stage_speed_control_buttons(control_x, speed_y, panel_width)
         
-        # 速度調整表示
-        speed_text = "Speed: 1x"
-        if self.execution_controller:
-            current_speed = getattr(self.execution_controller.state, 'sleep_interval', 1.0)
-            if current_speed >= 1.0:
-                speed_text = "Speed: 1x"
-            elif current_speed >= 0.5:
-                speed_text = "Speed: 2x"
-            elif current_speed >= 0.25:
-                speed_text = "Speed: 4x"
-            elif current_speed >= 0.125:
-                speed_text = "Speed: 8x"
+        # 超高速警告表示
+        if self.current_speed_multiplier in [10, 50]:
+            self._render_ultra_speed_warning(control_x, panel_y, panel_width)
+        
+        # ボタン登録（初回のみ）
+        self._register_buttons_once_7stage(step_rect, continue_rect, pause_rect, reset_rect, exit_rect)
+    
+    def _draw_7stage_speed_control_buttons(self, control_x: int, speed_y: int, panel_width: int) -> None:
+        """🚀 v1.2.5: 7段階速度制御ボタン群描画（横一列配置）"""
+        
+        # 速度ラベル
+        speed_label = self.small_font.render("Speed Control:", True, self.colors['text'])
+        self.screen.blit(speed_label, (control_x + 10, speed_y))
+        
+        # 横一列レイアウト設定
+        all_speeds = [1, 2, 3, 4, 5, 10, 50]
+        buttons_y = speed_y + 15
+        
+        # ボタン幅とマージンを調整（7個のボタンがパネル幅に収まるよう）
+        available_width = panel_width - 200  # ラベルとmarginを考慮
+        total_button_width = available_width // 7
+        button_width = min(total_button_width - 3, 35)  # 最大35px、間隔3px
+        button_margin = 3
+        
+        buttons_x_start = control_x + 10
+        
+        # 横一列に7個のボタンを配置
+        for i, multiplier in enumerate(all_speeds):
+            button_x = buttons_x_start + i * (button_width + button_margin)
+            
+            # ボタン描画
+            rect = pygame.Rect(button_x, buttons_y, button_width, self.speed_button_height)
+            
+            # ボタン色選択
+            if multiplier == self.current_speed_multiplier:
+                button_color = self.button_colors['speed_selected']
+                text_color = self.button_colors['button_text_dark']
+            elif multiplier in [10, 50]:
+                button_color = self.button_colors['speed_ultra']
+                text_color = self.button_colors['button_text']
             else:
-                speed_text = "Speed: 16x"
+                button_color = self.button_colors['speed_standard']
+                text_color = self.button_colors['button_text']
+            
+            # ボタン描画
+            pygame.draw.rect(self.screen, button_color, rect)
+            pygame.draw.rect(self.screen, self.colors['text'], rect, 1)  # ボーダー
+            
+            # テキスト描画（小さめフォント）
+            text_surface = self.small_font.render(f"x{multiplier}", True, text_color)
+            text_rect = text_surface.get_rect(center=rect.center)
+            self.screen.blit(text_surface, text_rect)
+            
+            # ボタン矩形を登録
+            self.speed_button_rects[f'speed_{multiplier}'] = rect
         
-        # Speed表示をExitボタンの右側に配置
-        speed_surface = self.small_font.render(speed_text, True, self.colors['text'])
-        speed_x = button_x_start + (self.button_width + self.button_margin) * 5  # Exitボタンの右側
-        speed_y = button_y + 2  # ボタンと同じ高さ
+        # 現在の速度表示（下部）
+        current_speed_text = f"Current: x{self.current_speed_multiplier}"
+        if self.current_speed_multiplier in [10, 50]:
+            current_speed_text += " ⚡"  # 超高速インディケーター
         
-        # パネル内に収まる場合のみ表示
-        if speed_x + speed_surface.get_width() <= panel_rect.right - 5:
-            self.screen.blit(speed_surface, (speed_x, speed_y))
+        speed_info_surface = self.small_font.render(current_speed_text, True, self.colors['text'])
+        speed_info_x = control_x + panel_width - speed_info_surface.get_width() - 10
+        self.screen.blit(speed_info_surface, (speed_info_x, speed_y + 40))
+    
+    def _draw_speed_button(self, x: int, y: int, text: str, multiplier: int) -> pygame.Rect:
+        """🚀 v1.2.5: 速度制御ボタン描画"""
+        rect = pygame.Rect(x, y, self.speed_button_width, self.speed_button_height)
+        
+        # ボタン色選択
+        if multiplier == self.current_speed_multiplier:
+            # 選択中速度
+            button_color = self.button_colors['speed_selected']
+            text_color = self.button_colors['button_text_dark']
+        elif multiplier in [10, 50]:
+            # 超高速
+            button_color = self.button_colors['speed_ultra']
+            text_color = self.button_colors['button_text']
+        else:
+            # 標準速度
+            button_color = self.button_colors['speed_standard']
+            text_color = self.button_colors['button_text']
+        
+        # ボタン描画
+        pygame.draw.rect(self.screen, button_color, rect)
+        pygame.draw.rect(self.screen, (128, 128, 128), rect, 1)
+        
+        # テキスト描画
+        text_surface = self.small_font.render(text, True, text_color)
+        text_rect = text_surface.get_rect(center=rect.center)
+        self.screen.blit(text_surface, text_rect)
+        
+        return rect
+    
+    def _render_ultra_speed_warning(self, control_x: int, panel_y: int, panel_width: int) -> None:
+        """🚀 v1.2.5: 超高速実行警告表示"""
+        warning_text = f"⚠️ Ultra-Speed Mode (x{self.current_speed_multiplier})"
+        warning_surface = self.small_font.render(warning_text, True, (255, 100, 0))  # オレンジ色
+        warning_x = control_x + panel_width - warning_surface.get_width() - 10
+        warning_y = panel_y + 8
+        self.screen.blit(warning_surface, (warning_x, warning_y))
     
     def _register_buttons_once(self, step_rect, continue_rect, pause_rect, reset_rect, exit_rect):
         """ボタンをEventProcessingEngineに一度だけ登録"""
@@ -886,6 +1005,89 @@ class GuiRenderer(Renderer):
             )
             self._buttons_registered = True
             print("🔧 EventProcessingEngineボタン登録完了")
+    
+    def _register_buttons_once_7stage(self, step_rect, continue_rect, pause_rect, reset_rect, exit_rect):
+        """🚀 v1.2.5: 7段階速度制御対応ボタン登録"""
+        # 基本実行制御ボタン登録
+        self._register_buttons_once(step_rect, continue_rect, pause_rect, reset_rect, exit_rect)
+        
+        # 7段階速度制御ボタン登録（1回のみ）
+        if hasattr(self, 'speed_button_rects') and not hasattr(self, '_7stage_buttons_registered'):
+            for speed_key, speed_rect in self.speed_button_rects.items():
+                # speed_1, speed_2, ... から倍率を抽出
+                multiplier = int(speed_key.split('_')[1])
+                self.event_processing_engine.register_button(
+                    speed_key, speed_rect,
+                    lambda m=multiplier: self._handle_7stage_speed_button_click(m),
+                    EventPriority.MEDIUM
+                )
+            self._7stage_buttons_registered = True
+            print(f"🚀 7段階速度制御ボタン登録完了: {len(self.speed_button_rects)}個")
+    
+    def _handle_7stage_speed_button_click(self, multiplier: int) -> bool:
+        """🚀 v1.2.5: 7段階速度ボタンクリック処理"""
+        try:
+            if not self._7stage_speed_manager:
+                print("⚠️ 7段階速度制御システムが初期化されていません")
+                print(f"   _7stage_speed_manager = {getattr(self, '_7stage_speed_manager', 'NOT_SET')}")
+                print(f"   _ultra_speed_controller = {getattr(self, '_ultra_speed_controller', 'NOT_SET')}")
+                return False
+            
+            # 速度変更実行
+            success = self._7stage_speed_manager.apply_speed_change_realtime(multiplier)
+            
+            if success:
+                # UI状態更新
+                old_multiplier = self.current_speed_multiplier
+                self.current_speed_multiplier = multiplier
+                
+                # 🚀 重要: ExecutionControllerのsleep_intervalを直接更新（統一化）
+                try:
+                    new_sleep_interval = self._7stage_speed_manager.calculate_sleep_interval(multiplier)
+                    execution_controller = self._7stage_speed_manager.execution_controller
+                    execution_controller.state.sleep_interval = new_sleep_interval
+                    
+                    print(f"✅ 速度変更成功: x{old_multiplier} → x{multiplier}")
+                    print(f"   ExecutionController.sleep_interval = {new_sleep_interval}秒")
+                    
+                except Exception as update_e:
+                    print(f"   ExecutionController更新エラー: {update_e}")
+                
+                # 超高速モード処理
+                if multiplier in [10, 50]:
+                    self._handle_ultra_high_speed_mode_activation(multiplier)
+                
+                return True
+            else:
+                print(f"❌ 速度変更失敗: x{multiplier}")
+                return False
+                
+        except Exception as e:
+            print(f"❌ 7段階速度ボタンクリックエラー: {e}")
+            return False
+    
+    def _handle_ultra_high_speed_mode_activation(self, multiplier: int) -> None:
+        """🚀 v1.2.5: 超高速モード有効化処理"""
+        if not self._ultra_speed_controller:
+            print("⚠️ UltraHighSpeedController未初期化")
+            return
+        
+        target_interval = 0.02 if multiplier == 50 else 0.1  # x50=0.02s, x10=0.1s
+        
+        success = self._ultra_speed_controller.enable_ultra_high_speed_mode(target_interval)
+        if success:
+            self.speed_warning_display = True
+            print(f"🏃‍♂️ 超高速モード有効化: x{multiplier}")
+        else:
+            print(f"❌ 超高速モード有効化失敗: x{multiplier}")
+    
+    def update_7stage_speed_display(self) -> None:
+        """🚀 v1.2.5: 7段階速度表示更新"""
+        if self._7stage_speed_manager:
+            self.current_speed_multiplier = self._7stage_speed_manager.get_current_speed_multiplier()
+            
+            # 超高速警告フラグ更新
+            self.speed_warning_display = self.current_speed_multiplier in [10, 50]
         
         # ボタン領域は既に上記で設定済み（exit含む5つのボタン）
         

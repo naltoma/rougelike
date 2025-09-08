@@ -102,7 +102,8 @@ class LayoutConstraintManager:
         constraint = self.current_constraint
         
         # 情報パネルの開始位置（Execution Control + マップの下）
-        control_panel_height = 55  # Execution Controlパネル高さ
+        # 🚀 v1.2.5: 7段階速度制御対応 - 動的なコントロールパネル高さを使用
+        control_panel_height = constraint.control_panel_height  # 動的な値を使用（90px）
         info_y = constraint.margin + control_panel_height + constraint.margin + constraint.game_area_height + constraint.margin
         
         # 情報パネル幅を400pxに調整

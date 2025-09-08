@@ -10,7 +10,8 @@ rougelike/
 │       └── gui-critical-fixes-v1.2.1/  # 🆕 v1.2.1 Critical button fixes spec
 ├── .claude/            # Claude Code commands
 ├── docs/               # Project documentation
-│   ├── v1.2.4.md       # 📋 v1.2.4 TODOs (初回起動時動作改善)
+│   ├── v1.2.5.md       # 🚀 v1.2.5 TODOs (Continue実行速度調整機能)
+│   ├── v1.2.4.md       # 📋 v1.2.4 Initial Execution Behavior Enhancement documentation (COMPLETED)
 │   ├── v1.2.3.md       # 🔗 v1.2.3 Google Apps Script Webhook Integration documentation (COMPLETED)
 │   ├── v1.2.2.md       # 📊 v1.2.2 Session Logging Integration documentation
 │   ├── v1.2.1.md       # 🔧 v1.2.1 Critical Fixes documentation
@@ -19,11 +20,11 @@ rougelike/
 │   ├── teacher_setup_guide.md   # 🆕 教員向けWebhookセットアップガイド
 │   ├── student_setup_guide.md   # 🆕 学生向けWebhookセットアップガイド
 │   └── v0_1st_plan.md  # Original planning documents
-├── engine/             # Core game engine (21 files + v1.2.1 critical fixes)
+├── engine/             # Core game engine (24 files + v1.2.4 initial execution behavior)
 ├── stages/             # YAML stage definitions
-├── tests/              # Comprehensive test suite (26+ files)
+├── tests/              # Comprehensive test suite (30+ files)
 ├── temp/               # Temporary files and screenshots
-├── main.py             # Entry point (v1.2.3 GUI + session logging + webhook ready)
+├── main.py             # Entry point (v1.2.4 GUI + initial confirmation mode + webhook ready)
 ├── student_example.py  # Student sample code
 ├── upload_webhook.py   # 🆕 Webhook upload tool (v1.2.3)
 ├── test_multiple_students.py  # 🆕 Multiple students test tool (v1.2.3)
@@ -38,7 +39,7 @@ rougelike/
 
 ## Subdirectory Structures
 
-### `/engine/` - Core Game Engine (v1.2.3 - Webhook Integration Complete)
+### `/engine/` - Core Game Engine (v1.2.4 - Initial Execution Behavior Complete)
 ```
 engine/
 ├── __init__.py                 # Core data models (9,705 bytes)
@@ -60,10 +61,15 @@ engine/
 ├── quality_assurance.py       # QA system (28,750 bytes)
 ├── data_uploader.py           # Google Sheets (24,052 bytes) [DEPRECATED v1.2.3]
 ├── ✅ execution_controller.py  # v1.1: Step execution control system
-├── ✅ hyperparameter_manager.py # v1.1: Parameter validation & management
+├── ✅ hyperparameter_manager.py # v1.1: Parameter validation & management (v1.2.4拡張)
 ├── ✅ session_log_manager.py   # v1.1: Enhanced session logging
 ├── ✅ action_history_tracker.py # v1.1: Detailed action tracking
-└── 🆕 webhook_uploader.py      # v1.2.3: Google Apps Script Webhook integration
+├── 🆕 webhook_uploader.py      # v1.2.3: Google Apps Script Webhook integration
+├── 📋 initial_confirmation_flag_manager.py # v1.2.4: Initial execution mode management
+├── 📋 stage_description_renderer.py # v1.2.4: Structured stage description display
+├── 📋 conditional_session_logger.py # v1.2.4: Conditional session logging
+├── 📋 stage_description_error.py    # v1.2.4: Stage description error handling
+└── 📋 initial_confirmation_mode_error.py # v1.2.4: Confirmation mode error handling
 ```
 
 ### `/tests/` - Comprehensive Test Suite (pytest v1.0.1)
@@ -90,6 +96,10 @@ tests/
 ├── test_session_*.py             # Session testing
 ├── test_stage_loader.py          # Stage loading tests (12,357 bytes)
 ├── test_validator.py             # Validation tests (10,815 bytes)
+├── test_initial_confirmation_flag_manager.py  # v1.2.4: Initial confirmation tests
+├── test_stage_description_renderer.py  # v1.2.4: Stage description tests
+├── test_conditional_session_logger.py  # v1.2.4: Conditional logging tests
+├── test_initial_execution_behavior_integration.py  # v1.2.4: Integration tests
 ├── config/                       # Test configurations
 ├── data/                         # Test data files
 └── test_data/                    # Additional test assets
@@ -154,6 +164,15 @@ Local JSON Logs -> upload_webhook.py -> WebhookUploader -> Google Apps Script
 Session Selection -> Config Management -> HTTP POST (JSON) -> Auto Sheet Creation
      ↓                     ↓                   ↓                    ↓
 Stage Filtering -> Connection Test -> TLS Encryption -> Student Data Update
+
+📋 v1.2.4 Initial Execution Behavior Flow:
+First Execution Check -> InitialConfirmationFlagManager -> Confirmation Mode
+     ↓                           ↓                              ↓
+Stage Description Display -> StageDescriptionRenderer -> GUI Understanding Phase
+     ↓                           ↓                              ↓
+Mode Switch (ENABLE_LOGGING) -> ConditionalSessionLogger -> Selective Logging
+     ↓                           ↓                              ↓
+Execution Mode Entry -> Normal solve() Flow -> Session Logging
 ```
 
 ## File Naming Conventions
@@ -238,9 +257,9 @@ from engine.renderer import GuiRenderer, CuiRenderer
 4. **Student API**: Update `/engine/api.py` if needed
 5. **Documentation**: Update README.md and `/docs/`
 
-## Testing Strategy (v1.2.3 - pytest + Webhook Integration Validated)
-- **Comprehensive Coverage**: 26+ test files covering all 21+ engine components (including v1.2.3)  
-- **Test Success Rate**: 88.9% (23/26 tests passing) - maintained through v1.2.3 integration
+## Testing Strategy (v1.2.4 - pytest + Initial Execution Behavior Validated)
+- **Comprehensive Coverage**: 30+ test files covering all 24+ engine components (including v1.2.4)  
+- **Test Success Rate**: 88.9% (maintained through v1.2.4 integration)
 - **pytest Integration**: Full pytest framework with markers and plugins
 - **Test Categories**:
   - Unit tests: Isolated component testing
@@ -260,4 +279,5 @@ from engine.renderer import GuiRenderer, CuiRenderer
 - **Quality Assurance**: Automated quality metrics and test-driven development
 - **✅ v1.2.1 Test Coverage**: Step/Pause/Reset button functionality, execution controller stability (COMPLETED)
 - **✅ v1.2.2 Test Coverage**: Session logging structure validation, code quality metrics testing (COMPLETED)
-- **🔗 v1.2.3 Test Coverage**: Webhook uploader functionality, configuration management, multiple student simulation
+- **✅ v1.2.3 Test Coverage**: Webhook uploader functionality, configuration management, multiple student simulation (COMPLETED)
+- **📋 v1.2.4 Test Coverage**: Initial confirmation mode validation, stage description rendering, conditional session logging (COMPLETED)

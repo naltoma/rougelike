@@ -16,6 +16,8 @@ import argparse
 import logging
 import sys
 from pathlib import Path
+# 確認モードでもExecutionModeが必要なため、常にimport
+from engine import ExecutionMode
 
 # プロジェクト設定
 import config
@@ -57,9 +59,102 @@ def setup_stage(stage_id: str, student_id: str):
     solve()実行前の準備作業を実行
     """
     logger.debug(f"ステージセットアップ開始: stage_id={stage_id}, student_id={student_id}")
+    print(f"🔧 setup_stage() が呼び出されました: stage_id={stage_id}, student_id={student_id}")
+    
     from engine.api import initialize_api, initialize_stage
+    from engine.enhanced_7stage_speed_control_manager import Enhanced7StageSpeedControlManager
+    from engine.ultra_high_speed_controller import UltraHighSpeedController
+    from engine.speed_control_error_handler import SpeedControlErrorHandler
     
     print("🎮 ゲーム開始！")
+    
+    # 🚀 v1.2.5: 7段階速度制御システム初期化
+    speed_manager = None
+    ultra_controller = None
+    error_handler = None
+    
+    try:
+        print("🚀 7段階速度制御システム初期化中...")
+        
+        # Step 1: Enhanced7StageSpeedControlManager 作成
+        print("   Step 1: Enhanced7StageSpeedControlManager 作成中...")
+        try:
+            speed_manager = Enhanced7StageSpeedControlManager(execution_controller)
+            print(f"   ✅ speed_manager created: {speed_manager}")
+        except Exception as e1:
+            print(f"   ❌ speed_manager作成失敗: {e1}")
+            raise e1
+        
+        # Step 2: UltraHighSpeedController 作成
+        print("   Step 2: UltraHighSpeedController 作成中...")
+        try:
+            ultra_controller = UltraHighSpeedController(speed_manager)
+            print(f"   ✅ ultra_controller created: {ultra_controller}")
+        except Exception as e2:
+            print(f"   ❌ ultra_controller作成失敗: {e2}")
+            raise e2
+        
+        # Step 3: SpeedControlErrorHandler 作成（オプショナル）
+        print("   Step 3: SpeedControlErrorHandler 作成中...")
+        try:
+            error_handler = SpeedControlErrorHandler(
+                speed_manager=speed_manager,
+                ultra_controller=ultra_controller,
+                execution_controller=execution_controller
+            )
+            print(f"   ✅ error_handler created: {error_handler}")
+        except Exception as e3:
+            print(f"   ⚠️ error_handler作成失敗（オプショナル）: {e3}")
+            error_handler = None  # エラーハンドラーなしで継続
+        
+        # Step 4: ExecutionController統合（必須）
+        print("   Step 4: ExecutionController に統合中...")
+        try:
+            print(f"   execution_controller before setup: {execution_controller}")
+            
+            execution_controller.setup_7stage_speed_control(
+                speed_manager, ultra_controller
+            )
+            
+            # 統合後確認
+            setup_success = (
+                hasattr(execution_controller, '_7stage_speed_manager') and
+                hasattr(execution_controller, '_ultra_high_speed_controller')
+            )
+            
+            if setup_success:
+                print(f"   ✅ ExecutionController統合成功")
+                print(f"   _7stage_speed_manager: {getattr(execution_controller, '_7stage_speed_manager', 'NOT_SET')}")
+                print(f"   _ultra_high_speed_controller: {getattr(execution_controller, '_ultra_high_speed_controller', 'NOT_SET')}")
+            else:
+                print(f"   ❌ ExecutionController統合失敗")
+                raise Exception("setup_7stage_speed_control failed to set attributes")
+            
+        except Exception as e4:
+            print(f"   ❌ ExecutionController統合失敗: {e4}")
+            raise e4
+        
+        # Step 5: エラーハンドラー設定（オプショナル）
+        if error_handler:
+            execution_controller.speed_error_handler = error_handler
+            print("   ✅ エラーハンドラー設定完了")
+        
+        # Step 6: 初期速度をExecutionControllerに適用
+        print("   Step 6: 初期速度設定（x1）を適用中...")
+        try:
+            initial_sleep_interval = speed_manager.calculate_sleep_interval(1)  # x1 = 1.0秒
+            execution_controller.state.sleep_interval = initial_sleep_interval
+            print(f"   ✅ 初期速度設定完了: x1 (sleep_interval={initial_sleep_interval}秒)")
+        except Exception as e6:
+            print(f"   ⚠️ 初期速度設定失敗: {e6}")
+        
+        print("✅ 7段階速度制御システム初期化完了")
+        
+    except Exception as e:
+        print(f"⚠️ 7段階速度制御システム初期化失敗: {e}")
+        print("   初期化に失敗しましたが、標準機能で継続します")
+        # import traceback
+        # traceback.print_exc()
     
     # APIレイヤー初期化
     initialize_api("gui")  # デフォルトGUIモード
@@ -68,10 +163,56 @@ def setup_stage(stage_id: str, student_id: str):
     from engine.api import _global_api
     _global_api.execution_controller = execution_controller
     
-    # ステージ初期化
+    # ステージ初期化（レンダラー作成完了）
     if not initialize_stage(stage_id):
         print("❌ ステージ初期化失敗")
         return False
+    
+    # ステージ初期化後に7段階速度制御をレンダラーに統合
+    if hasattr(_global_api, 'renderer') and _global_api.renderer:
+        try:
+            print(f"🔍 統合前チェック:")
+            print(f"   _global_api: {_global_api}")
+            print(f"   _global_api.renderer: {_global_api.renderer}")
+            print(f"   renderer type: {type(_global_api.renderer).__name__}")
+            print(f"   execution_controller._7stage_speed_manager: {getattr(execution_controller, '_7stage_speed_manager', 'NOT_SET')}")
+            print(f"   execution_controller._ultra_high_speed_controller: {getattr(execution_controller, '_ultra_high_speed_controller', 'NOT_SET')}")
+            
+            # ExecutionControllerの属性が存在するかチェック
+            if not hasattr(execution_controller, '_7stage_speed_manager'):
+                print("⚠️ ExecutionController._7stage_speed_manager が存在しません")
+                print("   7段階速度制御システムは無効化されました（標準速度制御で継続）")
+                print("✅ GUI統合スキップ: 標準速度制御で動作")
+                return True  # 7段階速度制御なしでも継続
+            
+            if not hasattr(execution_controller, '_ultra_high_speed_controller'):
+                print("⚠️ ExecutionController._ultra_high_speed_controller が存在しません")
+                print("   7段階速度制御システムは無効化されました（標準速度制御で継続）")
+                print("✅ GUI統合スキップ: 標準速度制御で動作")
+                return True  # 7段階速度制御なしでも継続
+            
+            # レンダラーに速度制御システムを設定
+            print("   レンダラーへの設定実行中...")
+            _global_api.renderer._7stage_speed_manager = execution_controller._7stage_speed_manager
+            _global_api.renderer._ultra_speed_controller = execution_controller._ultra_high_speed_controller
+            _global_api.renderer.error_handler = getattr(execution_controller, 'speed_error_handler', None)
+            
+            # 現在の速度倍率を同期（デフォルトx2を維持）
+            if hasattr(_global_api.renderer, 'current_speed_multiplier') and execution_controller._7stage_speed_manager:
+                # speed_managerがx2でない場合のみ、デフォルトx2に設定
+                if execution_controller._7stage_speed_manager.current_speed_multiplier != 2:
+                    execution_controller._7stage_speed_manager.apply_speed_change_realtime(2)
+                _global_api.renderer.current_speed_multiplier = execution_controller._7stage_speed_manager.current_speed_multiplier
+                print(f"   速度倍率同期: x{_global_api.renderer.current_speed_multiplier}")
+            
+            print(f"🔍 統合後確認:")
+            print(f"   renderer._7stage_speed_manager: {getattr(_global_api.renderer, '_7stage_speed_manager', 'NOT_SET')}")
+            print(f"   renderer._ultra_speed_controller: {getattr(_global_api.renderer, '_ultra_speed_controller', 'NOT_SET')}")
+            print("✅ GUI統合完了: 7段階速度制御")
+        except Exception as e:
+            print(f"⚠️ GUI統合警告: {e}")
+            import traceback
+            traceback.print_exc()
         
     return True
 
@@ -542,7 +683,15 @@ def main():
                 except Exception as render_error:
                     print(f"⚠️ 描画エラー: {render_error}")
             
-            time.sleep(0.016)  # 約60FPS
+            # 連続実行中は描画フレームレートを動的調整（実行モード時のみ）
+            if 'execution_controller' in locals() and hasattr(execution_controller, 'state'):
+                if execution_controller.state.mode == ExecutionMode.CONTINUOUS and execution_controller.state.sleep_interval < 0.016:
+                    # 高速実行時（16ms未満）は描画を最小限に
+                    time.sleep(max(0.001, execution_controller.state.sleep_interval / 2))  # アクション間隔の半分
+                else:
+                    time.sleep(0.016)  # 通常時は60FPS
+            else:
+                time.sleep(0.016)  # 確認モード時は固定60FPS
     
     # 実行モード時のsolve()関数解析
     print("\n🔍 solve()関数を解析中...")
@@ -566,7 +715,6 @@ def main():
         
         # 🆕 v1.2.1: GUI更新ループ（新ExecutionMode対応）- 無限ループ修正
         from engine.api import _global_api
-        from engine import ExecutionMode
         import pygame
         import time
         
@@ -672,22 +820,22 @@ def main():
             
             # STEP_EXECUTING状態の処理
             if current_mode == ExecutionMode.STEP_EXECUTING:
-                # ステップ実行中は短い間隔でチェック
-                time.sleep(0.01)  # 10ms間隔でチェック
-                if loop_count % 10 == 0:  # 100msごとに状態確認
+                # ステップ実行中は最小スリープ
+                time.sleep(0.001)  # 1ms間隔でチェック
+                if loop_count % 100 == 0:  # 100msごとに状態確認
                     print(f"⚡ ステップ実行中... (ループ: {loop_count})")
             
             # PAUSE_PENDING状態の処理  
             elif current_mode == ExecutionMode.PAUSE_PENDING:
-                # 一時停止待機中は短い間隔でチェック
-                time.sleep(0.01)  # 10ms間隔でチェック
-                if loop_count % 50 == 0:  # 500msごとに状態確認
+                # 一時停止待機中は最小スリープ
+                time.sleep(0.001)  # 1ms間隔でチェック
+                if loop_count % 500 == 0:  # 500msごとに状態確認
                     print(f"⏸️ 一時停止待機中... (ループ: {loop_count})")
             
             # RESET状態の処理
             elif current_mode == ExecutionMode.RESET:
                 print("🔄 リセット状態を検出しました")
-                time.sleep(0.05)  # 50ms待機
+                time.sleep(0.001)  # 最小スリープ
             
             # ERROR状態の処理
             elif current_mode == ExecutionMode.ERROR:
@@ -695,7 +843,7 @@ def main():
                 error_detail = execution_controller.get_execution_state_detail()
                 if error_detail and error_detail.last_error:
                     print(f"エラー内容: {error_detail.last_error}")
-                time.sleep(0.1)  # 100ms待機
+                time.sleep(0.01)  # 10ms待機（エラー表示のため少し長め）
             
             elif current_mode == ExecutionMode.STEPPING:
                 # ステップ実行モード：solve()を動的解析して1つずつ実行
@@ -724,7 +872,7 @@ def main():
                         print(f"❌ ステップ実行エラー: {e}")
                         execution_controller.single_step_requested = False
                 
-                time.sleep(0.016)  # ~60 FPS
+                # ステップ実行モードではスリープなし（ユーザー待機）
             
             elif current_mode == ExecutionMode.CONTINUOUS:
                 # 連続実行モード：STEPPINGと同じ仕組みだが、wait_for_action()で自動進行
@@ -774,14 +922,14 @@ def main():
                         execution_controller.single_step_requested = False
                         execution_controller.state.mode = ExecutionMode.ERROR
                 
-                time.sleep(0.016)  # ~60 FPS
+                # 連続実行モードではアクション間隔スリープのみ（line 898で実行）
             
             else:
                 # 通常のモード変更チェック（デバッグ出力付き）
                 if loop_count % 300 == 0:  # 5秒ごとにデバッグ出力
                     print(f"🔄 待機中... モード: {current_mode.value} (ループ: {loop_count})")
-                # CPUを節約
-                time.sleep(0.016)  # ~60 FPS
+                # CPUを節約（最小限のスリープ）
+                time.sleep(0.001)  # 1ms - CPU節約のみ
             
             loop_count += 1
         

@@ -92,6 +92,24 @@
   - 同一学生データ自動上書き機能
   - 共有フォルダ配置・権限管理
 
+## 📋 v1.2.4 Initial Execution Behavior Enhancement Components (COMPLETED)
+- **InitialConfirmationFlagManager**: 初回実行管理システム
+  - 初回実行判定とステージ履歴管理
+  - 確認モード/実行モードの状態切り替え
+  - HyperParametersData拡張による永続化
+- **StageDescriptionRenderer**: ステージ説明表示システム
+  - 構造化されたステージ詳細情報表示
+  - YAML定義からの自動情報抽出
+  - フォールバック機能とエラー処理
+- **ConditionalSessionLogger**: 条件付きログシステム
+  - 実行モードに応じた選択的ログ記録
+  - 確認モード時のログ除外機能
+  - 既存SessionLoggerとの統合設計
+- **専用エラーハンドリング**: 教育的エラー管理
+  - StageDescriptionError (ステージ説明関連)
+  - InitialConfirmationModeError (確認モード関連)
+  - 分離された例外クラスによる適切な処理
+
 ## Development Environment
 - **Python**: 3.8+ 必須
 - **仮想環境**: conda推奨
@@ -121,10 +139,11 @@ conda activate rougelike
 pip install -r requirements.txt
 
 # 実行
-python main.py          # GUI v1.2.3 mode（デフォルト・Critical Fixes完了・セッションログ統合完了・Webhook対応）
+python main.py          # GUI v1.2.4 mode（デフォルト・初回確認モード対応・Webhook対応）
 python main.py --cui    # CUI mode
 python main.py --gui    # 明示的GUI指定
 python student_example.py  # 学生サンプル実行
+# v1.2.4: ENABLE_LOGGING = False (確認モード) / True (実行モード)
 
 # セッションログ確認（v1.2.2）
 python show_session_logs.py  # ステージ別ディレクトリ対応版

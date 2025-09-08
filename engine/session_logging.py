@@ -41,6 +41,11 @@ class EventType(Enum):
     SYSTEM_MESSAGE = "system_message"
     PERFORMANCE_METRIC = "performance_metric"
     DEBUG_INFO = "debug_info"
+    # 🚀 v1.2.5: 7段階速度制御イベント
+    SPEED_CONTROL_CHANGED = "speed_control_changed"
+    ULTRA_HIGH_SPEED_ENABLED = "ultra_high_speed_enabled"
+    SPEED_PRECISION_MEASURED = "speed_precision_measured"
+    SPEED_DEGRADATION_OCCURRED = "speed_degradation_occurred"
 
 
 @dataclass
@@ -106,6 +111,15 @@ class SessionSummary:
     successful_stages: int = 0
     total_play_time: timedelta = field(default_factory=lambda: timedelta())
     
+    # 🚀 v1.2.5: 7段階速度制御メトリクス
+    speed_changes: int = 0
+    speed_usage_time: Dict[int, float] = field(default_factory=dict)  # {multiplier: seconds}
+    max_speed_used: int = 1
+    ultra_high_speed_usage: float = 0.0  # seconds
+    precision_measurements: int = 0
+    precision_failures: int = 0
+    speed_degradations: int = 0
+    
     @property
     def duration(self) -> Optional[timedelta]:
         """セッション時間"""
@@ -139,7 +153,15 @@ class SessionSummary:
             "total_errors": self.total_errors,
             "hints_used": self.hints_used,
             "successful_stages": self.successful_stages,
-            "total_play_time": str(self.total_play_time)
+            "total_play_time": str(self.total_play_time),
+            # 🚀 v1.2.5: 7段階速度制御メトリクス
+            "speed_changes": self.speed_changes,
+            "speed_usage_time": self.speed_usage_time,
+            "max_speed_used": self.max_speed_used,
+            "ultra_high_speed_usage": self.ultra_high_speed_usage,
+            "precision_measurements": self.precision_measurements,
+            "precision_failures": self.precision_failures,
+            "speed_degradations": self.speed_degradations
         }
 
 
@@ -635,6 +657,166 @@ class SessionLogger:
         except Exception as e:
             self.system_logger.error(f"エクスポートエラー: {e}")
             return False
+    
+    # 🚀 v1.2.5: 7段階速度制御専用ログ機能
+    
+    def log_speed_control_change(self, from_multiplier: int, to_multiplier: int, 
+                                success: bool, transition_time_ms: float = None):
+        """速度制御変更ログ"""
+        if not self.current_session:
+            return
+        
+        data = {
+            "from_multiplier": from_multiplier,
+            "to_multiplier": to_multiplier,
+            "success": success,
+            "is_ultra_high_speed": to_multiplier in [10, 50],
+            "transition_time_ms": transition_time_ms
+        }
+        
+        message = f"速度変更: x{from_multiplier} → x{to_multiplier} ({'成功' if success else '失敗'})"
+        if transition_time_ms:
+            message += f" ({transition_time_ms:.1f}ms)"
+        
+        self.log_event(
+            EventType.SPEED_CONTROL_CHANGED,
+            LogLevel.INFO,
+            message,
+            data
+        )
+        
+        # サマリー更新
+        with self._lock:
+            if success:
+                self.current_session.speed_changes += 1
+                self.current_session.max_speed_used = max(
+                    self.current_session.max_speed_used, to_multiplier
+                )
+    
+    def log_ultra_high_speed_enabled(self, multiplier: int, target_interval_ms: float):
+        """超高速モード有効化ログ"""
+        if not self.current_session:
+            return
+        
+        data = {
+            "multiplier": multiplier,
+            "target_interval_ms": target_interval_ms,
+            "precision_tolerance_ms": 5.0 if multiplier == 50 else 10.0
+        }
+        
+        message = f"超高速モード有効化: x{multiplier} ({target_interval_ms}ms間隔)"
+        
+        self.log_event(
+            EventType.ULTRA_HIGH_SPEED_ENABLED,
+            LogLevel.INFO,
+            message,
+            data
+        )
+    
+    def log_speed_precision_measurement(self, multiplier: int, target_interval_ms: float, 
+                                      actual_interval_ms: float, deviation_ms: float, 
+                                      within_tolerance: bool):
+        """速度精度測定ログ"""
+        if not self.current_session:
+            return
+        
+        data = {
+            "multiplier": multiplier,
+            "target_interval_ms": target_interval_ms,
+            "actual_interval_ms": actual_interval_ms,
+            "deviation_ms": deviation_ms,
+            "within_tolerance": within_tolerance,
+            "precision_percentage": ((target_interval_ms - abs(deviation_ms)) / target_interval_ms) * 100
+        }
+        
+        status = "精度OK" if within_tolerance else "精度NG"
+        message = f"速度精度測定 x{multiplier}: {actual_interval_ms:.1f}ms (偏差{deviation_ms:+.1f}ms) - {status}"
+        
+        self.log_event(
+            EventType.SPEED_PRECISION_MEASURED,
+            LogLevel.DEBUG if within_tolerance else LogLevel.WARNING,
+            message,
+            data
+        )
+        
+        # サマリー更新
+        with self._lock:
+            self.current_session.precision_measurements += 1
+            if not within_tolerance:
+                self.current_session.precision_failures += 1
+    
+    def log_speed_degradation(self, original_multiplier: int, degraded_multiplier: int, 
+                            reason: str, failure_count: int):
+        """速度性能低下ログ"""
+        if not self.current_session:
+            return
+        
+        data = {
+            "original_multiplier": original_multiplier,
+            "degraded_multiplier": degraded_multiplier,
+            "reason": reason,
+            "failure_count": failure_count,
+            "speed_drop": original_multiplier - degraded_multiplier
+        }
+        
+        message = f"速度性能低下: x{original_multiplier} → x{degraded_multiplier} (理由: {reason}, 失敗{failure_count}回)"
+        
+        self.log_event(
+            EventType.SPEED_DEGRADATION_OCCURRED,
+            LogLevel.WARNING,
+            message,
+            data
+        )
+        
+        # サマリー更新
+        with self._lock:
+            self.current_session.speed_degradations += 1
+    
+    def update_speed_usage_time(self, multiplier: int, usage_seconds: float):
+        """速度使用時間更新"""
+        if not self.current_session:
+            return
+        
+        with self._lock:
+            current_time = self.current_session.speed_usage_time.get(multiplier, 0.0)
+            self.current_session.speed_usage_time[multiplier] = current_time + usage_seconds
+            
+            # 超高速使用時間
+            if multiplier in [10, 50]:
+                self.current_session.ultra_high_speed_usage += usage_seconds
+    
+    def get_7stage_speed_metrics(self) -> Dict[str, Any]:
+        """7段階速度制御メトリクス取得"""
+        if not self.current_session:
+            return {}
+        
+        with self._lock:
+            session = self.current_session
+            total_speed_time = sum(session.speed_usage_time.values())
+            
+            metrics = {
+                "speed_changes": session.speed_changes,
+                "max_speed_used": session.max_speed_used,
+                "ultra_high_speed_usage_seconds": session.ultra_high_speed_usage,
+                "precision_measurements": session.precision_measurements,
+                "precision_failures": session.precision_failures,
+                "precision_success_rate": (
+                    (session.precision_measurements - session.precision_failures) / session.precision_measurements
+                    if session.precision_measurements > 0 else 0.0
+                ),
+                "speed_degradations": session.speed_degradations,
+                "speed_usage_distribution": session.speed_usage_time.copy(),
+                "average_speed": (
+                    sum(speed * time for speed, time in session.speed_usage_time.items()) / total_speed_time
+                    if total_speed_time > 0 else 1.0
+                ),
+                "ultra_speed_usage_percentage": (
+                    session.ultra_high_speed_usage / total_speed_time * 100
+                    if total_speed_time > 0 else 0.0
+                )
+            }
+            
+            return metrics
     
     def __del__(self):
         """デストラクタ - リソースクリーンアップ"""

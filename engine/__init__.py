@@ -462,6 +462,126 @@ class ActionHistoryEntry:
         """文字列表現"""
         return f"{self.sequence}: {self.action_name}()"
 
+# 🚀 v1.2.5: 7段階速度制御専用データモデル
+
+@dataclass
+class EnhancedExecutionState(ExecutionState):
+    """7段階速度制御拡張実行状態"""
+    # 7段階速度制御情報
+    current_speed_multiplier: int = 2  # デフォルトをx2に統一
+    speed_change_count: int = 0
+    ultra_high_speed_active: bool = False
+    precision_tolerance_ms: float = 5.0
+    
+    # 精度監視情報
+    last_precision_check: Optional[datetime] = None
+    precision_failure_count: int = 0
+    
+    def __post_init__(self):
+        """拡張バリデーション"""
+        super().__post_init__()
+        valid_multipliers = [1, 2, 3, 4, 5, 10, 50]
+        if self.current_speed_multiplier not in valid_multipliers:
+            raise ValueError(f"速度倍率は{valid_multipliers}のいずれかである必要があります")
+        if self.precision_tolerance_ms <= 0:
+            raise ValueError("精度許容値は0より大きい必要があります")
+
+
+@dataclass
+class SpeedControlMetrics:
+    """速度制御メトリクス"""
+    session_id: str
+    total_speed_changes: int = 0
+    speed_distribution: Dict[int, float] = field(default_factory=dict)  # {multiplier: usage_time}
+    ultra_speed_precision_stats: Dict[str, float] = field(default_factory=dict)
+    average_speed_multiplier: float = 1.0
+    max_speed_used: int = 1
+    realtime_changes_count: int = 0
+    
+    def __post_init__(self):
+        """バリデーション"""
+        if not self.session_id:
+            raise ValueError("セッションIDは必須です")
+        if self.total_speed_changes < 0:
+            raise ValueError("速度変更回数は0以上である必要があります")
+
+
+@dataclass
+class UltraSpeedPrecisionResult:
+    """超高速精度測定結果"""
+    target_interval_ms: float
+    actual_interval_ms: float
+    deviation_ms: float
+    within_tolerance: bool
+    measurement_timestamp: datetime = field(default_factory=datetime.now)
+    
+    def __post_init__(self):
+        """バリデーション"""
+        if self.target_interval_ms <= 0:
+            raise ValueError("目標間隔は0より大きい必要があります")
+        if self.actual_interval_ms < 0:
+            raise ValueError("実際の間隔は0以上である必要があります")
+
+
+@dataclass
+class SpeedTransitionEvent:
+    """速度切替イベント"""
+    from_multiplier: int
+    to_multiplier: int
+    transition_time_ms: float
+    success: bool
+    error_message: Optional[str] = None
+    timestamp: datetime = field(default_factory=datetime.now)
+    is_realtime: bool = False
+    
+    def __post_init__(self):
+        """バリデーション"""
+        valid_multipliers = [1, 2, 3, 4, 5, 10, 50]
+        if self.from_multiplier not in valid_multipliers:
+            raise ValueError(f"変更前倍率は{valid_multipliers}のいずれかである必要があります")
+        if self.to_multiplier not in valid_multipliers:
+            raise ValueError(f"変更後倍率は{valid_multipliers}のいずれかである必要があります")
+        if self.transition_time_ms < 0:
+            raise ValueError("切替時間は0以上である必要があります")
+
+
+# v1.2.5: 7段階速度制御専用例外クラス
+
+class Enhanced7StageSpeedControlError(ExecutionControlError):
+    """7段階速度制御関連エラー基底クラス"""
+    pass
+
+
+class InvalidSpeedMultiplierError(Enhanced7StageSpeedControlError):
+    """無効な速度倍率エラー"""
+    pass
+
+
+class UltraHighSpeedError(Enhanced7StageSpeedControlError):
+    """超高速実行エラー"""
+    pass
+
+
+class HighPrecisionTimingError(Enhanced7StageSpeedControlError):
+    """高精度タイミングエラー"""
+    pass
+
+
+class RealTimeSpeedChangeError(Enhanced7StageSpeedControlError):
+    """リアルタイム速度変更エラー"""
+    pass
+
+
+class ExecutionSyncError(Enhanced7StageSpeedControlError):
+    """実行同期エラー"""
+    pass
+
+
+class SpeedDegradationError(Enhanced7StageSpeedControlError):
+    """速度性能低下エラー"""
+    pass
+
+
 __all__ = [
     "Direction", "GameStatus", "ItemType", "EnemyType", "ExecutionMode",
     "Position", "Character", "Enemy", "Item", "Board",
@@ -470,5 +590,12 @@ __all__ = [
     "ExecutionStateDetail", "PauseRequest", "ResetResult", "StepResult", "ActionBoundary",
     # 🆕 v1.2.1: 例外クラス
     "ExecutionControlError", "StepExecutionError", "PauseControlError", 
-    "ResetOperationError", "StateTransitionError"
+    "ResetOperationError", "StateTransitionError",
+    # 🚀 v1.2.5: 7段階速度制御データモデル
+    "EnhancedExecutionState", "SpeedControlMetrics", "UltraSpeedPrecisionResult", 
+    "SpeedTransitionEvent",
+    # 🚀 v1.2.5: 7段階速度制御例外クラス
+    "Enhanced7StageSpeedControlError", "InvalidSpeedMultiplierError", "UltraHighSpeedError",
+    "HighPrecisionTimingError", "RealTimeSpeedChangeError", "ExecutionSyncError",
+    "SpeedDegradationError"
 ]

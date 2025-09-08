@@ -27,13 +27,13 @@ Python初学者向け演習フレームワーク - ローグライク風ステ�
 - **教員支援**: 自動ログ収集・分析による学習状況把握
 - **高度テストシステム**: pytest対応、88.9%成功率、失敗分析・再実行機能
 
-## Current Version: v1.2.3 (Google Apps Script Webhook Integration Complete)
-- **コアエンジン**: 21ファイル (拡張) - 完全実装済み + v1.2.3機能
-- **テストスイート**: 26ファイル - pytest統合、マーカー対応
+## Current Version: v1.2.4 (Initial Execution Behavior Enhancement Complete)
+- **コアエンジン**: 24ファイル (拡張) - 完全実装済み + v1.2.4機能
+- **テストスイート**: 30ファイル - pytest統合、マーカー対応
 - **品質評価**: 優良⭐ (機能カバレッジ100%, テスト成功率88.9%)
 - **高機能テスト**: 失敗分析、再実行、並列実行、カバレッジ対応
-- **✅ v1.2.3完了機能**: Google Apps Script Webhook連携（無料・簡単セットアップ、ステージ別シート自動管理）
-- **📋 v1.2.4予定**: 初回起動時動作改善（ステージクリア条件確認、試行回数管理最適化）
+- **✅ v1.2.4完了機能**: 初回確認モード、ステージ理解システム、条件付きセッションログ
+- **📋 v1.2.5予定**: Continue実行速度調整機能（x1〜x5倍速対応、UI拡張）
 
 ## Core Implemented Features  
 - GUI（pygame）+ CUI両対応、デフォルトGUI
@@ -82,11 +82,20 @@ Python初学者向け演習フレームワーク - ローグライク風ステ�
 - **共有フォルダ対応**: Google Drive共有フォルダ自動配置機能
 - **複数学生テスト**: `test_multiple_students.py`による開発・テスト支援
 
-## 📋 v1.2.4 Initial Execution Behavior Enhancement (PLANNED)
-- **初回起動時フラグ機能**: 新しいフラグ変数による初期状態管理
-- **ステージクリア条件表示**: シナリオファイルのdescription自動表示機能
-- **試行回数管理改善**: 初回確認時のセッションログ生成除外
-- **学習フロー最適化**: ステージ理解→コード記述→実行の自然な流れ構築
+## 📋 v1.2.4 Initial Execution Behavior Enhancement Features (COMPLETED)
+- **🔰 初回確認モード**: 初回実行時のステージ理解促進システム（確認→理解→実行の段階的フロー）
+- **📚 ステージ理解待機システム**: ステージ詳細情報表示、GUI確認、理解促進機能
+- **🔧 柔軟なモード切り替え**: ENABLE_LOGGING による確認モード/実行モードの切り替え
+- **InitialConfirmationFlagManager**: 初回実行判定、ステージ説明履歴管理
+- **StageDescriptionRenderer**: 構造化ステージ説明表示、フォールバック機能
+- **ConditionalSessionLogger**: 条件付きセッションログ記録（確認モード時除外）
+- **専用エラーハンドリング**: StageDescriptionError、InitialConfirmationModeError
+
+## 🚀 v1.2.5 Continue Execution Speed Control Features (PLANNED)
+- **実行速度調整**: Continue実行時のx1〜x5倍速設定（デフォルト1秒→0.2秒まで調整可能）
+- **Execution Control パネル拡張**: 3段構成UI（パネル名・イベントボタン・スピード設定）
+- **スピード選択UI**: x1/x2/x3/x4/x5 ボタンによる直感的速度変更
+- **リアルタイム速度変更**: 実行中の動的な速度調整機能
 
 ## Advanced Testing Framework
 - **pytest統合**: 高機能テスト実行と分析
