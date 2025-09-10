@@ -31,7 +31,7 @@ def test_load_basic_stage():
     assert stage.goal_position == Position(4, 4)
     assert len(stage.walls) == 1  # グリッドに1つの壁がある
     assert Position(2, 2) in stage.walls
-    assert stage.allowed_apis == ["turn_left", "turn_right", "move"]
+    assert stage.allowed_apis == ["turn_left", "turn_right", "move", "see"]
     assert stage.constraints["max_turns"] == 20
     
     print("✅ Stage01読み込み成功")

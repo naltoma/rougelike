@@ -121,18 +121,20 @@ class StageDescriptionRenderer:
                     lines.append(f"   {item_name} ({item_type}) at ({pos[0]}, {pos[1]})")
             lines.append("")
         
-        # クリア条件
+        # クリア条件（ステージ固有）
         lines.append("🏆 クリア条件:")
-        lines.append("   ゴール位置に到達する")
+        victory_conditions = self._get_stage_specific_victory_conditions(stage)
+        for condition in victory_conditions:
+            lines.append(f"   {condition}")
         if max_turns < 100:
             lines.append(f"   {max_turns}ターン以内でクリアする")
         lines.append("")
         
-        # フッター
+        # ヒント（ステージ固有）
         lines.append("💡 ヒント:")
-        lines.append("   1. まずは基本的な移動から始めましょう")
-        lines.append("   2. see()でマップの状況を確認できます")
-        lines.append("   3. プランを立ててから実装してみてください")
+        hints = self._get_stage_specific_hints(stage)
+        for i, hint in enumerate(hints, 1):
+            lines.append(f"   {i}. {hint}")
         lines.append("")
         lines.append("=" * self.max_width)
         
@@ -169,7 +171,7 @@ class StageDescriptionRenderer:
         lines.append("")
         
         lines.append("💡 学習のヒント:")
-        lines.append("   1. see()でマップの状況を確認しましょう")
+        lines.append("   1. まずは基本的な移動から始めましょう")
         lines.append("   2. 段階的にプログラムを作成していきましょう")
         lines.append("   3. エラーが出たら落ち着いてデバッグしましょう")
         lines.append("")
@@ -218,6 +220,61 @@ class StageDescriptionRenderer:
             lines.append(current_line)
         
         return lines if lines else [""]
+    
+    def _get_stage_specific_victory_conditions(self, stage) -> List[str]:
+        """ステージ固有の勝利条件を取得
+        
+        Args:
+            stage: Stageオブジェクト
+        
+        Returns:
+            List[str]: 勝利条件のリスト
+        """
+        conditions = []
+        
+        # ステージ固有の勝利条件
+        if stage.id == "stage04":
+            conditions.append("敵を倒す（attack()で攻撃）")
+            conditions.append("ゴール位置に到達する")
+        elif hasattr(stage, 'enemies') and stage.enemies:
+            # 敵がいるステージは一般的に敵を倒す必要がある
+            conditions.append("すべての敵を倒す")
+            conditions.append("ゴール位置に到達する")
+        else:
+            # 通常のステージは移動のみ
+            conditions.append("ゴール位置に到達する")
+        
+        return conditions
+    
+    def _get_stage_specific_hints(self, stage) -> List[str]:
+        """ステージ固有のヒントを取得
+        
+        Args:
+            stage: Stageオブジェクト
+        
+        Returns:
+            List[str]: ヒントのリスト
+        """
+        hints = []
+        
+        # ステージ固有のヒント
+        if stage.id == "stage04":
+            hints.append("attack()関数を使って正面の敵を攻撃できます")
+            hints.append("敵を倒してからゴールに向かいましょう")
+            hints.append("プランを立ててから実装してみてください")
+        elif hasattr(stage, 'enemies') and stage.enemies:
+            # 敵がいるステージのヒント
+            hints.append("敵に注意して移動しましょう")
+            hints.append("attack()で敵を倒すことができます")
+            hints.append("プランを立ててから実装してみてください")
+        else:
+            # 通常のステージのヒント
+            hints.append("まずは基本的な移動から始めましょう")
+            hints.append("プランを立ててから実装してみてください")
+            if "see" in getattr(stage, 'allowed_apis', []):
+                hints.append("必要に応じてsee()でマップの状況を確認できます")
+        
+        return hints
     
     def get_stage_summary(self, stage_id: str) -> Dict[str, Any]:
         """ステージサマリー情報の取得

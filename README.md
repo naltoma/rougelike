@@ -1,13 +1,13 @@
 # Python初学者向けローグライク演習フレームワーク
 
-[![Version](https://img.shields.io/badge/version-v1.2.5-blue.svg)](VERSION_HISTORY.md)
+[![Version](https://img.shields.io/badge/version-v1.2.6-blue.svg)](VERSION_HISTORY.md)
 [![Python](https://img.shields.io/badge/python-3.8+-green.svg)](https://python.org)
 [![Tests](https://img.shields.io/badge/tests-88.9%25-brightgreen.svg)](#🧪-テスト実行)
 [![Quality](https://img.shields.io/badge/quality-優良⭐-gold.svg)](#📈-品質メトリクス)
 
 Python初学者のための教育用ローグライクゲームフレームワークです。体験的なプログラミング学習を通じて、基礎的なプログラミングスキルを習得できます。
 
-> **⚡ v1.2.5 7段階速度制御完了！** Continue実行をx1〜x50で調整可能・超高速デバッグ対応 - 詳細は [VERSION_HISTORY.md](VERSION_HISTORY.md) をご覧ください
+> **⚔️ v1.2.6 Attack System統合完了！** 戦闘システム完全統合・Stage04-06追加・敵との戦闘ベース学習実現 - 詳細は [VERSION_HISTORY.md](VERSION_HISTORY.md) をご覧ください
 
 ## 🎯 特徴
 
@@ -17,6 +17,7 @@ Python初学者のための教育用ローグライクゲームフレームワ�
 - **段階的ヒントシステム**: 学習者の進度に応じた適応的支援
 - **個別学習プロファイル**: 学習者の特性を分析・最適化
 - **⚡ 7段階速度制御**: x1〜x50でContinue実行速度を調整・デバッグ効率向上
+- **⚔️ 戦闘ベース学習**: Stage04-06で攻撃システムを通じた戦略的思考習得
 
 ### 📊 教師支援機能
 - **リアルタイム学習データ収集**: 学習者の行動を詳細記録
@@ -25,10 +26,11 @@ Python初学者のための教育用ローグライクゲームフレームワ�
 - **個別支援推奨**: 完了フラグ・アクション数・コード行数分析
 
 ### 🎮 豊富なゲーム要素
+- **攻撃・戦闘システム**: プレイヤー攻撃、敵カウンター攻撃、ターン制戦闘
 - **高度な敵AIシステム**: 巡回、追跡、警備、ハンター
 - **包括的アイテムシステム**: 装備、消耗品、エンチャント
 - **戦闘・ドロップシステム**: 戦略的思考を促進
-- **拡張可能ステージ**: カスタム学習シナリオ
+- **拡張可能ステージ**: カスタム学習シナリオ（Stage01-06対応）
 
 ## 📁 プロジェクト構造
 

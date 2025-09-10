@@ -27,13 +27,13 @@ Python初学者向け演習フレームワーク - ローグライク風ステ�
 - **教員支援**: 自動ログ収集・分析による学習状況把握
 - **高度テストシステム**: pytest対応、88.9%成功率、失敗分析・再実行機能
 
-## Current Version: v1.2.4 (Initial Execution Behavior Enhancement Complete)
-- **コアエンジン**: 24ファイル (拡張) - 完全実装済み + v1.2.4機能
-- **テストスイート**: 30ファイル - pytest統合、マーカー対応
+## Current Version: v1.2.5 (Continue Execution Speed Control Complete)
+- **コアエンジン**: 25ファイル (拡張) - 完全実装済み + v1.2.5機能
+- **テストスイート**: 32ファイル - pytest統合、マーカー対応
 - **品質評価**: 優良⭐ (機能カバレッジ100%, テスト成功率88.9%)
 - **高機能テスト**: 失敗分析、再実行、並列実行、カバレッジ対応
-- **✅ v1.2.4完了機能**: 初回確認モード、ステージ理解システム、条件付きセッションログ
-- **📋 v1.2.5予定**: Continue実行速度調整機能（x1〜x5倍速対応、UI拡張）
+- **✅ v1.2.5完了機能**: 7段階速度制御（x1〜x50）、超高速デバッグ実行、リアルタイム速度調整
+- **📋 v1.2.6予定**: attack機能導入（stage04-06実装、敵AIカウンター攻撃システム）
 
 ## Core Implemented Features  
 - GUI（pygame）+ CUI両対応、デフォルトGUI
@@ -91,11 +91,19 @@ Python初学者向け演習フレームワーク - ローグライク風ステ�
 - **ConditionalSessionLogger**: 条件付きセッションログ記録（確認モード時除外）
 - **専用エラーハンドリング**: StageDescriptionError、InitialConfirmationModeError
 
-## 🚀 v1.2.5 Continue Execution Speed Control Features (PLANNED)
-- **実行速度調整**: Continue実行時のx1〜x5倍速設定（デフォルト1秒→0.2秒まで調整可能）
-- **Execution Control パネル拡張**: 3段構成UI（パネル名・イベントボタン・スピード設定）
-- **スピード選択UI**: x1/x2/x3/x4/x5 ボタンによる直感的速度変更
+## 🚀 v1.2.5 Continue Execution Speed Control Features (COMPLETED)
+- **7段階速度制御**: x1〜x50の細かい速度調整（2.0秒〜0.001秒）
+- **超高速実行対応**: x50での最高速度デバッグ実行
+- **Enhanced 7-Stage Speed Control Manager**: 高精度スリープ制御システム
+- **Ultra High Speed Controller**: 超高速実行専用コントローラー
 - **リアルタイム速度変更**: 実行中の動的な速度調整機能
+- **Speed Control Error Handler**: 速度制御専用エラー処理システム
+
+## 📋 v1.2.6 Attack System Integration Features (PLANNED)
+- **attack機能導入**: キャラクターの攻撃アクション実装
+- **敵AIカウンター攻撃**: 攻撃を受けた敵の反撃システム
+- **stage04-06実装**: 攻撃ベースの新ステージ（1回攻撃・3回攻撃・HP10倍攻撃）
+- **敵の方向転換システム**: 攻撃を受けた敵の自動方向調整
 
 ## Advanced Testing Framework
 - **pytest統合**: 高機能テスト実行と分析

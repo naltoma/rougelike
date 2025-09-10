@@ -6,7 +6,7 @@
 
 from typing import List, Optional, Dict, Any, Tuple
 from dataclasses import dataclass
-from . import GameState, Character, Position, Direction, GameStatus
+from . import GameState, Character, Position, Direction, GameStatus, TurnPhase
 from .enemy_system import EnemyManager, AdvancedEnemy, EnemyFactory
 from .item_system import ItemManager, Inventory, AdvancedItem, ItemEffectProcessor
 from .game_state import GameStateManager
@@ -38,6 +38,11 @@ class AdvancedGameState(GameState):
         self.effect_processor = ItemEffectProcessor()
         self.combat_log: List[str] = []
         self.turn_events: List[str] = []
+        
+        # v1.2.6: ターンベース戦闘システム
+        self.current_turn_phase: TurnPhase = TurnPhase.PLAYER
+        self.turn_number: int = 1
+        self.enemies_attacked_this_turn: List[int] = []  # 今ターンに攻撃を受けた敵のID
         
         # 敵とアイテムを高度なシステムに移行
         self._migrate_enemies()
@@ -422,3 +427,34 @@ class DropSystem:
             messages.append(f"{item.data.base_item.name}がドロップされました")
         
         return messages
+    
+    # v1.2.6: ターンベース戦闘システム
+    def next_turn(self):
+        """次のターンに進む"""
+        if self.current_turn_phase == TurnPhase.PLAYER:
+            # プレイヤーターン終了、敵ターン開始
+            self.current_turn_phase = TurnPhase.ENEMY
+            self.turn_events.append(f"ターン {self.turn_number}: 敵フェーズ開始")
+        else:
+            # 敵ターン終了、次のプレイヤーターン開始
+            self.current_turn_phase = TurnPhase.PLAYER
+            self.turn_number += 1
+            self.enemies_attacked_this_turn.clear()
+            self.turn_events.append(f"ターン {self.turn_number}: プレイヤーフェーズ開始")
+    
+    def is_player_turn(self) -> bool:
+        """プレイヤーのターンかどうか"""
+        return self.current_turn_phase == TurnPhase.PLAYER
+    
+    def is_enemy_turn(self) -> bool:
+        """敵のターンかどうか"""
+        return self.current_turn_phase == TurnPhase.ENEMY
+    
+    def mark_enemy_attacked(self, enemy_id: int):
+        """敵が攻撃を受けたことをマーク"""
+        if enemy_id not in self.enemies_attacked_this_turn:
+            self.enemies_attacked_this_turn.append(enemy_id)
+    
+    def was_enemy_attacked_this_turn(self, enemy_id: int) -> bool:
+        """この敵が今ターン攻撃を受けたかチェック"""
+        return enemy_id in self.enemies_attacked_this_turn

@@ -74,6 +74,20 @@
   - total_execution_time削除（ステップ実行では無意味）
   - データ構造最適化とサイズ削減
 
+## 🚀 v1.2.5 Continue Execution Speed Control Components (COMPLETED)
+- **Enhanced7StageSpeedControlManager**: 7段階速度制御システム
+  - x1〜x50の細かい速度調整（2.0秒〜0.001秒）
+  - 高精度スリープ制御（1ms精度対応）
+  - リアルタイム速度変更機能
+- **UltraHighSpeedController**: 超高速実行専用コントローラー
+  - x10〜x50の超高速実行対応
+  - デバッグ用途の視認不可レベル速度
+  - パフォーマンス最適化された実行制御
+- **SpeedControlErrorHandler**: 速度制御専用エラー処理
+  - Enhanced7StageSpeedErrors例外クラス
+  - 速度設定エラーの適切な処理
+  - フォールバック機能とエラー回復
+
 ## 🔗 v1.2.3 Google Apps Script Webhook Integration Components (COMPLETED)
 - **WebhookUploader**: Google Apps Script Webhook送信機能
   - HTTP POST通信による無料Webhook連携
@@ -139,11 +153,12 @@ conda activate rougelike
 pip install -r requirements.txt
 
 # 実行
-python main.py          # GUI v1.2.4 mode（デフォルト・初回確認モード対応・Webhook対応）
+python main.py          # GUI v1.2.5 mode（デフォルト・7段階速度制御・初回確認モード・Webhook対応）
 python main.py --cui    # CUI mode
 python main.py --gui    # 明示的GUI指定
 python student_example.py  # 学生サンプル実行
-# v1.2.4: ENABLE_LOGGING = False (確認モード) / True (実行モード)
+# v1.2.5: 7段階速度制御対応・初回確認モード統合
+# ENABLE_LOGGING = False (確認モード) / True (実行モード)
 
 # セッションログ確認（v1.2.2）
 python show_session_logs.py  # ステージ別ディレクトリ対応版

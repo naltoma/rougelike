@@ -131,10 +131,13 @@ class APILayer:
             enemies = []
             for enemy_data in stage.enemies:
                 enemy_type = getattr(EnemyType, enemy_data["type"].upper())
+                # ステージファイルからHPを取得し、max_hpも同じ値に設定
+                enemy_hp = enemy_data.get("hp", 30)
                 enemy = Enemy(
                     position=Position(*enemy_data["position"]),
-                    direction=getattr(Direction, enemy_data.get("direction", "N")),
-                    hp=enemy_data.get("hp", 30),
+                    direction=getattr(Direction, enemy_data.get("direction", "NORTH")),
+                    hp=enemy_hp,
+                    max_hp=enemy_hp,  # HPと同じ値をmax_hpに設定
                     attack_power=enemy_data.get("attack_power", 5),
                     enemy_type=enemy_type
                 )

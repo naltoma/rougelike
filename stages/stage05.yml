@@ -1,0 +1,58 @@
+id: stage05
+title: 3回攻撃ステージ
+description: 強い敵を3回攻撃して倒すステージです。敵はHP90を持ち、攻撃1回で30ダメージを与えるので3回攻撃が必要です。カウンター攻撃にも注意しましょう。
+
+board:
+  size: [6, 5]
+  grid:
+    - "......"
+    - "..#..."
+    - "......"
+    - "..#..."
+    - "......"
+  legend:
+    "#": "wall"
+    ".": "empty"
+    "P": "player"
+    "G": "goal"
+    "E": "enemy"
+
+player:
+  start: [0, 2]
+  direction: "E"
+
+goal:
+  position: [5, 2]
+
+enemies:
+  - id: "orc1"
+    type: "orc"
+    position: [3, 2]
+    hp: 90
+    behavior: "static"
+
+items: []
+
+constraints:
+  max_turns: 25
+  allowed_apis: ["turn_left", "turn_right", "move", "attack", "see"]
+
+victory_conditions:
+  - type: "defeat_all_enemies"
+  - type: "reach_goal"
+
+# 学習目標とヒント
+learning_objectives:
+  - "複数回攻撃が必要な敵との戦闘を学ぶ"
+  - "カウンター攻撃を受けることを理解する"
+  - "戦略的な攻撃順序を計画する"
+  - "障害物を回避しながら戦闘する"
+
+hints:
+  - "プレイヤーは西向き(E)、位置[0,2]で開始します"
+  - "敵は位置[3,2]、HP90です"
+  - "move()を3回実行して敵に接近しましょう"
+  - "attack()を3回実行して敵を倒しましょう"
+  - "敵はカウンター攻撃してくるので、HPに注意しましょう"
+  - "敵を倒したらmove()を2回実行してゴール[5,2]へ"
+  - "全体の戦略: move()×3 → attack()×3 → move()×2"

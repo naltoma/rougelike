@@ -10,36 +10,37 @@ rougelike/
 │       └── gui-critical-fixes-v1.2.1/  # 🆕 v1.2.1 Critical button fixes spec
 ├── .claude/            # Claude Code commands
 ├── docs/               # Project documentation
-│   ├── v1.2.5.md       # 🚀 v1.2.5 TODOs (Continue実行速度調整機能)
+│   ├── v1.2.6.md       # 📋 v1.2.6 TODOs (attack機能導入・敵AIカウンター攻撃)
+│   ├── v1.2.5.md       # 🚀 v1.2.5 Continue Execution Speed Control documentation (COMPLETED)
 │   ├── v1.2.4.md       # 📋 v1.2.4 Initial Execution Behavior Enhancement documentation (COMPLETED)
 │   ├── v1.2.3.md       # 🔗 v1.2.3 Google Apps Script Webhook Integration documentation (COMPLETED)
 │   ├── v1.2.2.md       # 📊 v1.2.2 Session Logging Integration documentation
 │   ├── v1.2.1.md       # 🔧 v1.2.1 Critical Fixes documentation
 │   ├── v1.1.md         # v1.1 Enhancement documentation
 │   ├── session-log-features.md  # Session logging feature details
-│   ├── teacher_setup_guide.md   # 🆕 教員向けWebhookセットアップガイド
-│   ├── student_setup_guide.md   # 🆕 学生向けWebhookセットアップガイド
+│   ├── teacher_setup_guide.md   # 教員向けWebhookセットアップガイド
+│   ├── student_setup_guide.md   # 学生向けWebhookセットアップガイド
 │   └── v0_1st_plan.md  # Original planning documents
-├── engine/             # Core game engine (24 files + v1.2.4 initial execution behavior)
+├── engine/             # Core game engine (40+ files + v1.2.5 speed control system)
 ├── stages/             # YAML stage definitions
-├── tests/              # Comprehensive test suite (30+ files)
+├── tests/              # Comprehensive test suite (32+ files)
 ├── temp/               # Temporary files and screenshots
-├── main.py             # Entry point (v1.2.4 GUI + initial confirmation mode + webhook ready)
+├── main.py             # Entry point (v1.2.5 GUI + 7-stage speed control + webhook ready)
 ├── student_example.py  # Student sample code
-├── upload_webhook.py   # 🆕 Webhook upload tool (v1.2.3)
-├── test_multiple_students.py  # 🆕 Multiple students test tool (v1.2.3)
+├── upload_webhook.py   # Webhook upload tool (v1.2.3)
+├── test_multiple_students.py  # Multiple students test tool (v1.2.3)
 ├── run_tests.py        # Pytest integration runner
 ├── conftest.py         # Pytest configuration
 ├── config.py           # Project configuration
-├── webhook_config.json # 🆕 Webhook configuration (generated)
+├── webhook_config.json # Webhook configuration (generated)
 ├── requirements.txt    # pip dependencies (pytest integrated)
 ├── Makefile            # Test automation
-└── README.md           # Setup instructions (v1.2.3 updated)
+└── README.md           # Setup instructions (v1.2.5 updated)
 ```
 
 ## Subdirectory Structures
 
-### `/engine/` - Core Game Engine (v1.2.4 - Initial Execution Behavior Complete)
+### `/engine/` - Core Game Engine (v1.2.5 - Continue Execution Speed Control Complete)
 ```
 engine/
 ├── __init__.py                 # Core data models (9,705 bytes)
@@ -64,12 +65,27 @@ engine/
 ├── ✅ hyperparameter_manager.py # v1.1: Parameter validation & management (v1.2.4拡張)
 ├── ✅ session_log_manager.py   # v1.1: Enhanced session logging
 ├── ✅ action_history_tracker.py # v1.1: Detailed action tracking
-├── 🆕 webhook_uploader.py      # v1.2.3: Google Apps Script Webhook integration
+├── 🔗 webhook_uploader.py      # v1.2.3: Google Apps Script Webhook integration
 ├── 📋 initial_confirmation_flag_manager.py # v1.2.4: Initial execution mode management
 ├── 📋 stage_description_renderer.py # v1.2.4: Structured stage description display
 ├── 📋 conditional_session_logger.py # v1.2.4: Conditional session logging
 ├── 📋 stage_description_error.py    # v1.2.4: Stage description error handling
-└── 📋 initial_confirmation_mode_error.py # v1.2.4: Confirmation mode error handling
+├── 📋 initial_confirmation_mode_error.py # v1.2.4: Confirmation mode error handling
+├── 🚀 enhanced_7stage_speed_control_manager.py # v1.2.5: 7-stage speed control system
+├── 🚀 ultra_high_speed_controller.py # v1.2.5: Ultra high-speed execution controller
+├── 🚀 speed_control_error_handler.py # v1.2.5: Speed control error handling
+├── 🚀 enhanced_7stage_speed_errors.py # v1.2.5: Speed control exceptions
+├── action_boundary_detector.py # Action boundary detection
+├── event_processing_engine.py  # Event processing system
+├── execution_controller_complex.py # Complex execution control
+├── layout_constraint_manager.py # GUI layout constraints
+├── pause_controller.py         # Pause functionality
+├── reset_manager.py           # Reset functionality
+├── session_data_models.py     # Session data structures
+├── session_log_loader.py      # Session log loading
+├── shared_folder_config_manager.py # Google Drive folder config
+├── solve_parser.py            # Solution parsing
+└── state_transition_manager.py # State transition management
 ```
 
 ### `/tests/` - Comprehensive Test Suite (pytest v1.0.1)
@@ -257,9 +273,9 @@ from engine.renderer import GuiRenderer, CuiRenderer
 4. **Student API**: Update `/engine/api.py` if needed
 5. **Documentation**: Update README.md and `/docs/`
 
-## Testing Strategy (v1.2.4 - pytest + Initial Execution Behavior Validated)
-- **Comprehensive Coverage**: 30+ test files covering all 24+ engine components (including v1.2.4)  
-- **Test Success Rate**: 88.9% (maintained through v1.2.4 integration)
+## Testing Strategy (v1.2.5 - pytest + Continue Execution Speed Control Validated)
+- **Comprehensive Coverage**: 32+ test files covering all 40+ engine components (including v1.2.5)  
+- **Test Success Rate**: 88.9% (maintained through v1.2.5 integration)
 - **pytest Integration**: Full pytest framework with markers and plugins
 - **Test Categories**:
   - Unit tests: Isolated component testing
@@ -269,7 +285,9 @@ from engine.renderer import GuiRenderer, CuiRenderer
   - Google Sheets tests: API integration tests [DEPRECATED v1.2.3]
   - **✅ v1.2.1 tests**: GUI critical fixes validation, button functionality testing (COMPLETED)
   - **✅ v1.2.2 tests**: Session logging integration validation, stage-specific directory testing (COMPLETED)
-  - **🔗 v1.2.3 tests**: Webhook integration testing, Google Apps Script communication validation
+  - **✅ v1.2.3 tests**: Webhook integration testing, Google Apps Script communication validation (COMPLETED)
+  - **✅ v1.2.4 tests**: Initial confirmation mode validation, stage description rendering, conditional session logging (COMPLETED)
+  - **🚀 v1.2.5 tests**: 7-stage speed control validation, ultra high-speed execution testing, speed control error handling (COMPLETED)
 - **Advanced Features**:
   - Test markers: unit/integration/gui classification
   - Failed test analysis and re-run commands
@@ -277,7 +295,4 @@ from engine.renderer import GuiRenderer, CuiRenderer
   - Coverage reporting with pytest-cov
   - HTML/JSON test reports
 - **Quality Assurance**: Automated quality metrics and test-driven development
-- **✅ v1.2.1 Test Coverage**: Step/Pause/Reset button functionality, execution controller stability (COMPLETED)
-- **✅ v1.2.2 Test Coverage**: Session logging structure validation, code quality metrics testing (COMPLETED)
-- **✅ v1.2.3 Test Coverage**: Webhook uploader functionality, configuration management, multiple student simulation (COMPLETED)
-- **📋 v1.2.4 Test Coverage**: Initial confirmation mode validation, stage description rendering, conditional session logging (COMPLETED)
+- **✅ v1.2.5 Test Coverage**: Enhanced 7-stage speed control manager, ultra high-speed controller, speed control error handling (COMPLETED)

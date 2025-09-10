@@ -418,6 +418,62 @@ class AdvancedEnemy(Enemy):
             "position": (self.position.x, self.position.y),
             "direction": self.direction.value
         }
+    
+    # v1.2.6: カウンター攻撃システム
+    def can_counter_attack(self, player_position: Position) -> bool:
+        """カウンター攻撃可能かチェック"""
+        if not self.is_alive() or self.stun_duration > 0:
+            return False
+        
+        # 隣接位置チェック（8方向）
+        dx = abs(self.position.x - player_position.x)
+        dy = abs(self.position.y - player_position.y)
+        return dx <= 1 and dy <= 1 and (dx + dy) > 0
+    
+    def counter_attack(self, player_position: Position) -> Dict[str, Any]:
+        """プレイヤーへのカウンター攻撃実行"""
+        if not self.can_counter_attack(player_position):
+            return {
+                "success": False,
+                "message": "カウンター攻撃不可能",
+                "damage": 0
+            }
+        
+        # プレイヤー方向を向く
+        self.turn_to_player(player_position)
+        
+        # 攻撃実行
+        damage = self.get_attack_damage()
+        
+        # 怒り値増加（攻撃を受けたため）
+        self.anger_level = min(1.0, self.anger_level + 0.3)
+        self.current_state = EnemyState.ATTACKING
+        
+        return {
+            "success": True,
+            "message": f"敵のカウンター攻撃! {damage}ダメージ",
+            "damage": damage,
+            "critical": random.random() < self.stats.critical_chance
+        }
+    
+    def turn_to_player(self, player_position: Position):
+        """プレイヤー方向に向きを変更"""
+        dx = player_position.x - self.position.x
+        dy = player_position.y - self.position.y
+        
+        # 最も近い方向を選択
+        if abs(dx) > abs(dy):
+            # 水平方向が主
+            if dx > 0:
+                self.direction = Direction.EAST
+            else:
+                self.direction = Direction.WEST
+        else:
+            # 垂直方向が主
+            if dy > 0:
+                self.direction = Direction.SOUTH
+            else:
+                self.direction = Direction.NORTH
 
 
 class EnemyManager:

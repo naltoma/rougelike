@@ -66,6 +66,11 @@ class EnemyType(Enum):
     LARGE_2X2 = "large_2x2"  # 大型敵 2x2
     LARGE_3X3 = "large_3x3"  # 大型敵 3x3
     SPECIAL_2X3 = "special_2x3"  # 特殊敵 2x3
+    # v1.2.6: 攻撃システム統合 - 新敵タイプ
+    GOBLIN = "goblin"         # ゴブリン（基本攻撃敵）
+    ORC = "orc"               # オーク（中級攻撃敵）
+    DRAGON = "dragon"         # ドラゴン（高級攻撃敵）
+    BOSS = "boss"             # ボス（最高級敵）
 
 class ExecutionMode(Enum):
     """実行モード"""
@@ -77,6 +82,11 @@ class ExecutionMode(Enum):
     COMPLETED = "completed"   # 実行完了
     RESET = "reset"          # 🆕 v1.2.1: リセット処理中
     ERROR = "error"          # 🆕 v1.2.1: エラー状態
+
+class TurnPhase(Enum):
+    """ターンフェーズ - v1.2.6攻撃システム統合"""
+    PLAYER = "player"         # プレイヤーターン
+    ENEMY = "enemy"           # 敵ターン
 
 @dataclass(frozen=True)
 class Position:
@@ -105,7 +115,7 @@ class Character:
     direction: Direction
     hp: int = 100
     max_hp: int = 100
-    attack_power: int = 10
+    attack_power: int = 30
     
     def __post_init__(self):
         """バリデーション"""
@@ -149,7 +159,12 @@ class Enemy(Character):
             EnemyType.NORMAL: (1, 1),
             EnemyType.LARGE_2X2: (2, 2),
             EnemyType.LARGE_3X3: (3, 3),
-            EnemyType.SPECIAL_2X3: (2, 3)
+            EnemyType.SPECIAL_2X3: (2, 3),
+            # v1.2.6: 攻撃システム統合 - 新敵タイプサイズ
+            EnemyType.GOBLIN: (1, 1),
+            EnemyType.ORC: (1, 1),
+            EnemyType.DRAGON: (2, 2),  # ドラゴンは大型
+            EnemyType.BOSS: (2, 2)     # ボスも大型
         }
         return sizes[self.enemy_type]
     
@@ -243,6 +258,19 @@ class GameState:
         if self.goal_position is None:
             return False
         return self.player.position == self.goal_position
+    
+    def check_victory_conditions(self):
+        """勝利条件チェック - v1.2.6攻撃システム統合"""
+        # ゴール位置に到達していない場合は勝利ではない
+        if not self.check_goal_reached():
+            return False
+        
+        # 敵が残っている場合は勝利ではない（stage04-06の要件）
+        alive_enemies = [enemy for enemy in self.enemies if enemy.is_alive()]
+        if alive_enemies:
+            return False
+        
+        return True
     
     def get_item_at(self, pos):
         """指定座標のアイテムを取得"""

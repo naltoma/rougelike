@@ -1,0 +1,59 @@
+id: stage06
+title: HP10倍攻撃ステージ
+description: 非常に強力な敵と戦うステージです。敵はHP300を持つ大型敵で、10回の攻撃が必要です。長期戦に備えた戦略と忍耐力が求められます。
+
+board:
+  size: [7, 5]
+  grid:
+    - "......."
+    - ".#...#."
+    - "......."
+    - ".#...#."
+    - "......."
+  legend:
+    "#": "wall"
+    ".": "empty"
+    "P": "player"
+    "G": "goal"
+    "E": "enemy"
+
+player:
+  start: [0, 2]
+  direction: "E"
+
+goal:
+  position: [6, 2]
+
+enemies:
+  - id: "dragon1"
+    type: "dragon"
+    position: [3, 2]
+    hp: 300
+    behavior: "static"
+
+items: []
+
+constraints:
+  max_turns: 50
+  allowed_apis: ["turn_left", "turn_right", "move", "attack", "see"]
+
+victory_conditions:
+  - type: "defeat_all_enemies"
+  - type: "reach_goal"
+
+# 学習目標とヒント
+learning_objectives:
+  - "長期戦における持久戦略を学ぶ"
+  - "大量の攻撃回数が必要な敵との戦闘"
+  - "HP管理と戦闘効率の重要性を理解"
+  - "複雑な地形での戦闘位置取り"
+
+hints:
+  - "プレイヤーは東向き(E)、位置[0,2]で開始します"
+  - "敵は位置[3,2]、HP300の強力な大型敵です"
+  - "move()を3回実行して敵に接近しましょう"
+  - "attack()を10回実行して敵を倒す必要があります"
+  - "カウンター攻撃を10回受けるので、戦略的に戦いましょう"
+  - "敵を倒したらmove()を3回実行してゴール[6,2]へ"
+  - "全体の戦略: move()×3 → attack()×10 → move()×3"
+  - "長期戦なので、see()で状況確認しながら進めましょう"

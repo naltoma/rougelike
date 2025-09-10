@@ -1,0 +1,54 @@
+id: stage04
+title: 初回攻撃ステージ
+description: 攻撃機能を学ぶステージです。敵を1回攻撃して倒してからゴールを目指しましょう。attack()関数を使って正面の敵を攻撃できます。
+
+board:
+  size: [5, 5]
+  grid:
+    - "....."
+    - "....."
+    - "....."
+    - "....."
+    - "....."
+  legend:
+    "#": "wall"
+    ".": "empty"
+    "P": "player"
+    "G": "goal"
+    "E": "enemy"
+
+player:
+  start: [0, 0]
+  direction: "E"
+
+goal:
+  position: [4, 0]
+
+enemies:
+  - id: "goblin1"
+    type: "goblin"
+    position: [2, 0]
+    hp: 10
+    behavior: "static"
+
+items: []
+
+constraints:
+  max_turns: 15
+  allowed_apis: ["turn_left", "turn_right", "move", "attack", "see"]
+
+victory_conditions:
+  - type: "defeat_all_enemies"
+  - type: "reach_goal"
+
+# 学習目標とヒント
+learning_objectives:
+  - "attack()関数の使用方法を覚える"
+  - "敵を攻撃してから移動する順序を理解する"
+  - "攻撃は正面1マスにいる敵にのみ有効であることを学ぶ"
+
+hints:
+  - "プレイヤーは東向き(E)で開始します"
+  - "敵は位置[2,0]にいるので、move()を1回実行してから attack()しましょう"
+  - "敵を倒したら、さらにmove()を3回実行してゴール[4,0]に到達しましょう"
+  - "全体で必要な行動: move(), attack(), move(), move(), move()"

@@ -35,7 +35,7 @@ class GameStateManager:
             position=player_start,
             direction=player_direction,
             hp=100,
-            attack_power=10
+            attack_power=30
         )
         
         # ゲーム状態作成
@@ -92,10 +92,16 @@ class GameStateManager:
             self.current_state.status = GameStatus.FAILED
             return
         
-        # ゴール到達判定
-        if self.current_state.check_goal_reached():
-            self.current_state.status = GameStatus.WON
-            return
+        # v1.2.6: 勝利条件チェック（敵を倒してからゴール到達）
+        if hasattr(self.current_state, 'check_victory_conditions'):
+            if self.current_state.check_victory_conditions():
+                self.current_state.status = GameStatus.WON
+                return
+        else:
+            # フォールバック：従来のゴール到達判定
+            if self.current_state.check_goal_reached():
+                self.current_state.status = GameStatus.WON
+                return
         
         # 敵が全滅した場合の処理（将来の拡張用）
         # ゴールが設定されておらず、敵もいない場合は勝利

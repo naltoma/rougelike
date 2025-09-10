@@ -364,7 +364,8 @@ class GuiRenderer(Renderer):
         game_area_height = self.height * self.cell_size
         
         # サイドバーに必要な最小高さを計算
-        min_sidebar_height = 60 + 130 + 200 + 30  # ヘッダー + プレイヤー情報 + ゲーム情報 + 凡例 + 余裕
+        # ヘッダー(30) + プレイヤー情報(130) + 敵情報(最大2体×90=180) + 凡例(150) + 余裕(50)
+        min_sidebar_height = 30 + 130 + 180 + 150 + 50  # 合計540px
         
         # 情報パネル・コントロールパネルの720px幅を考慮した画面サイズ計算
         info_control_width = 720  # 情報パネルとコントロールパネルの幅
@@ -464,6 +465,12 @@ class GuiRenderer(Renderer):
         
         # プレイヤーの向きを矢印で表示
         self._draw_player_direction(game_state.player, start_x, start_y)
+        
+        # 敵の向きを矢印で表示とインデックス表示
+        for i, enemy in enumerate(game_state.enemies):
+            if enemy.is_alive():
+                self._draw_enemy_direction(enemy, start_x, start_y)
+                self._draw_enemy_index(enemy, i + 1, start_x, start_y)
     
     def _get_cell_type(self, pos: Position, game_state: GameState) -> str:
         """位置のセル種類を取得"""
@@ -519,6 +526,51 @@ class GuiRenderer(Renderer):
             pygame.draw.line(self.screen, (255, 255, 255), 
                            (player_x, player_y), (end_x, end_y), 3)
     
+    def _draw_enemy_direction(self, enemy, start_x: int, start_y: int) -> None:
+        """敵の向きを矢印で表示"""
+        enemy_x = start_x + enemy.position.x * self.cell_size + self.cell_size // 2
+        enemy_y = start_y + enemy.position.y * self.cell_size + self.cell_size // 2
+        
+        # 向きに応じた矢印の先端位置計算
+        arrow_length = self.cell_size // 4
+        direction_offsets = {
+            Direction.NORTH: (0, -arrow_length),
+            Direction.EAST: (arrow_length, 0),
+            Direction.SOUTH: (0, arrow_length),
+            Direction.WEST: (-arrow_length, 0)
+        }
+        
+        if enemy.direction in direction_offsets:
+            dx, dy = direction_offsets[enemy.direction]
+            end_x = enemy_x + dx
+            end_y = enemy_y + dy
+            
+            # 敵の矢印を描画（黄色で表示）
+            pygame.draw.line(self.screen, (255, 255, 0), 
+                           (enemy_x, enemy_y), (end_x, end_y), 2)
+    
+    def _draw_enemy_index(self, enemy, index: int, start_x: int, start_y: int) -> None:
+        """敵のインデックス番号を右下に表示"""
+        enemy_x = start_x + enemy.position.x * self.cell_size
+        enemy_y = start_y + enemy.position.y * self.cell_size
+        
+        # セルの右下にインデックス番号を表示
+        index_text = str(index)
+        index_surface = self.small_font.render(index_text, True, (255, 255, 255))
+        
+        # 右下の位置に配置（少し内側にマージンを取る）
+        text_x = enemy_x + self.cell_size - index_surface.get_width() - 3
+        text_y = enemy_y + self.cell_size - index_surface.get_height() - 2
+        
+        # 背景色で可読性を高める（小さな背景矩形）
+        bg_rect = pygame.Rect(text_x - 2, text_y - 1, 
+                             index_surface.get_width() + 4, 
+                             index_surface.get_height() + 2)
+        pygame.draw.rect(self.screen, (0, 0, 0), bg_rect)  # 黒背景
+        
+        # インデックス番号を描画
+        self.screen.blit(index_surface, (text_x, text_y))
+    
     def _draw_sidebar(self, game_state: GameState) -> None:
         """サイドバーを描画（左側に配置）"""
         sidebar_x = self.margin  # 左側に配置
@@ -531,7 +583,7 @@ class GuiRenderer(Renderer):
         
         # サイドバー背景（十分に高く - 全ての要素が収まるように）
         # 最小高さは初期化時に計算済みなので、同じ値を使用
-        min_sidebar_height = 60 + 130 + 200 + 30  # ヘッダー + プレイヤー情報 + ゲーム情報 + 凡例 + 余裕
+        min_sidebar_height = 30 + 130 + 180 + 150 + 50  # ヘッダー + プレイヤー情報 + 敵情報 + 凡例 + 余裕
         calculated_height = self.height * self.cell_size
         sidebar_height = max(calculated_height, min_sidebar_height)
         sidebar_rect = pygame.Rect(sidebar_x, sidebar_y, 
@@ -558,26 +610,32 @@ class GuiRenderer(Renderer):
         
         y_offset += 20
         
-        # ゲーム情報
-        self._draw_text("Game Info", sidebar_x + 10, y_offset, self.font)
+        # 敵情報
+        self._draw_text("Enemy Info", sidebar_x + 10, y_offset, self.font)
         y_offset += 30
         
-        game_info = [
-            f"Turn: {game_state.turn_count}/{game_state.max_turns}",
-            f"Status: {game_state.status.value}",
-        ]
-        
-        if game_state.goal_position:
-            player_pos = game_state.player.position
-            goal_pos = game_state.goal_position
-            distance = int(player_pos.distance_to(goal_pos))
-            game_info.append(f"Goal Dist: {distance}")
-        
-        for info in game_info:
-            self._draw_text(info, sidebar_x + 20, y_offset, self.small_font)
+        alive_enemies = [(i, enemy) for i, enemy in enumerate(game_state.enemies) if enemy.is_alive()]
+        if alive_enemies:
+            for original_index, (list_index, enemy) in enumerate(alive_enemies[:2]):  # 最大2体まで表示
+                # 元のリスト内でのインデックス（1から始まる）を使用
+                display_index = list_index + 1
+                enemy_info = [
+                    f"Enemy {display_index}: {enemy.enemy_type.value}",
+                    f"Pos: ({enemy.position.x}, {enemy.position.y})",
+                    f"Dir: {enemy.direction.value}",
+                    f"HP: {enemy.hp}/{enemy.max_hp}",
+                    f"ATK: {enemy.attack_power}"
+                ]
+                
+                for info in enemy_info:
+                    self._draw_text(info, sidebar_x + 20, y_offset, self.small_font)
+                    y_offset += 18
+                y_offset += 5  # 敵間のスペース
+        else:
+            self._draw_text("No enemies alive", sidebar_x + 20, y_offset, self.small_font)
             y_offset += 20
         
-        y_offset += 20
+        y_offset += 10
         
         # 凡例
         self._draw_text("Legend", sidebar_x + 10, y_offset, self.font)

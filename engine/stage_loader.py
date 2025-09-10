@@ -179,7 +179,8 @@ class StageLoader:
             
             # タイプの検証
             enemy_type = enemy_data["type"]
-            valid_types = ["normal", "large_2x2", "large_3x3", "special_2x3"]
+            valid_types = ["normal", "large_2x2", "large_3x3", "special_2x3", 
+                          "goblin", "orc", "dragon", "boss"]
             if enemy_type not in valid_types:
                 raise StageValidationError(f"enemies[{i}].typeは {valid_types} のいずれかである必要があります: {enemy_type}")
     

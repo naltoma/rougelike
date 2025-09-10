@@ -1037,24 +1037,80 @@ class SessionLogManager:
                     logger.error(f"イベントログ記録エラー: {e}")
             
             def _calculate_code_metrics(self, solve_code: str) -> dict:
-                """コード品質メトリクス（行数カウント等）を計算"""
+                """コード品質メトリクス（行数カウント等）を計算
+                
+                コメント行・空行を除外したcode_linesを正確に計算する
+                """
                 try:
                     if not solve_code:
-                        return {"line_count": 0, "comment_count": 0, "blank_count": 0}
+                        return {"line_count": 0, "code_lines": 0, "comment_lines": 0, "blank_lines": 0}
                     
                     lines = solve_code.split('\n')
                     total_lines = len(lines)
                     comment_lines = 0
                     blank_lines = 0
+                    code_lines = 0
+                    
+                    in_multiline_string = False
+                    multiline_quote = None
                     
                     for line in lines:
                         stripped = line.strip()
+                        
+                        # 空行チェック
                         if not stripped:
                             blank_lines += 1
-                        elif stripped.startswith('#'):
+                            continue
+                        
+                        # 複数行文字列の処理
+                        if not in_multiline_string:
+                            # 複数行文字列の開始チェック
+                            if stripped.startswith('"""') or stripped.startswith("'''"):
+                                if stripped.startswith('"""'):
+                                    multiline_quote = '"""'
+                                else:
+                                    multiline_quote = "'''"
+                                
+                                # 同じ行で終了している場合
+                                if stripped.count(multiline_quote) >= 2:
+                                    # 同じ行で開始・終了 -> docstringの可能性が高い
+                                    comment_lines += 1
+                                else:
+                                    # 複数行の開始
+                                    in_multiline_string = True
+                                    comment_lines += 1
+                                continue
+                        else:
+                            # 複数行文字列の終了チェック
+                            if multiline_quote in stripped:
+                                in_multiline_string = False
+                                multiline_quote = None
+                                comment_lines += 1
+                                continue
+                            else:
+                                # 複数行文字列の中
+                                comment_lines += 1
+                                continue
+                        
+                        # 単行コメント（#で始まる行）
+                        if stripped.startswith('#'):
                             comment_lines += 1
-                    
-                    code_lines = total_lines - comment_lines - blank_lines
+                            continue
+                        
+                        # インラインコメントを含む行の処理
+                        # クォート内の#は無視する必要があるが、簡略化のため
+                        # #が含まれていてもコードがある場合は実行行とする
+                        
+                        # キャラクタ操作とは無関係な必須行を除外
+                        if (stripped.startswith('def ') or 
+                            stripped.startswith('from ') or 
+                            'set_auto_render' in stripped or
+                            stripped.startswith('print(')):
+                            # 必須行としてカウントしない
+                            continue
+                        
+                        # 実行可能コード行
+                        code_lines += 1
                     
                     return {
                         "line_count": total_lines,
@@ -1064,7 +1120,7 @@ class SessionLogManager:
                     }
                 except Exception as e:
                     logger.error(f"コード品質メトリクス計算エラー: {e}")
-                    return {"line_count": 0, "comment_count": 0, "blank_count": 0}
+                    return {"line_count": 0, "code_lines": 0, "comment_lines": 0, "blank_lines": 0}
             
             def _write_consolidated_log(self):
                 """統合ログファイルの書き込み"""

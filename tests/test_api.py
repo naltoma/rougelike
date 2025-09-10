@@ -14,6 +14,9 @@ def test_basic_movement():
     """基本移動APIテスト"""
     print("🚶 基本移動APIテスト...")
     
+    # API初期化
+    api.initialize_api("cui")
+    
     # ステージ初期化
     success = api.initialize_stage("stage01")
     assert success, "ステージ初期化失敗"
@@ -46,6 +49,9 @@ def test_basic_movement():
 def test_see_function():
     """see関数テスト"""
     print("👁️ see関数テスト...")
+    
+    # API初期化
+    api.initialize_api("cui")
     
     # ステージ初期化
     api.initialize_stage("stage01")
@@ -89,6 +95,9 @@ def test_api_restrictions():
     """API制限テスト"""
     print("🚫 API制限テスト...")
     
+    # API初期化
+    api.initialize_api("cui")
+    
     # stage01は基本移動のみ許可
     api.initialize_stage("stage01")
     
@@ -121,6 +130,9 @@ def test_api_restrictions():
 def test_game_completion():
     """ゲーム完了テスト"""
     print("🏆 ゲーム完了テスト...")
+    
+    # API初期化
+    api.initialize_api("cui")
     
     api.initialize_stage("stage01")
     
@@ -166,6 +178,9 @@ def test_undo_functionality():
     """取り消し機能テスト"""
     print("↩️ 取り消し機能テスト...")
     
+    # API初期化
+    api.initialize_api("cui")
+    
     api.initialize_stage("stage01")
     
     # 初期状態の確認
@@ -201,6 +216,9 @@ def test_undo_functionality():
 def test_reset_functionality():
     """リセット機能テスト"""
     print("🔄 リセット機能テスト...")
+    
+    # API初期化
+    api.initialize_api("cui")
     
     api.initialize_stage("stage01")
     
@@ -251,6 +269,7 @@ def test_error_handling():
     print("✅ 存在しないステージエラー処理")
     
     # 正常初期化後のテスト
+    api.initialize_api("cui")
     api.initialize_stage("stage01")
     
     # 境界を越えた移動テスト
@@ -281,6 +300,7 @@ def test_stage_variations():
     print("🎭 異なるステージテスト...")
     
     # Stage01テスト
+    api.initialize_api("cui")
     api.initialize_stage("stage01")
     info1 = api.see()
     assert info1["player"]["position"] == [0, 0]
@@ -306,6 +326,7 @@ def test_integration():
     print("🔗 統合テスト...")
     
     # 完全なゲームフローをテスト
+    api.initialize_api("cui")
     api.initialize_stage("stage01")
     
     # 初期状態確認

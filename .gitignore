@@ -1,6 +1,7 @@
 __pycache__
 .DS_Store
 data/
+main_*.py
 
 # OAuth credentials (security sensitive)
 .oauth_credentials/

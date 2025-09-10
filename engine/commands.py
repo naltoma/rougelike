@@ -270,13 +270,54 @@ class AttackCommand(Command):
                 # 敵を削除
                 game_state.enemies.remove(enemy)
             
+            # カウンター攻撃処理（敵が生きている場合のみ）
+            counter_message = ""
+            counter_damage = 0
+            player_defeated = False
+            
+            if not defeated and enemy.is_alive():
+                # 敵のカウンター処理：プレイヤーの方向確認と行動決定
+                from .combat_system import get_combat_system
+                combat_system = get_combat_system()
+                
+                # 1. プレイヤーとの位置関係を計算
+                dx = player.position.x - enemy.position.x
+                dy = player.position.y - enemy.position.y
+                
+                # プレイヤーの相対位置に応じて必要な向きを決定
+                if abs(dx) > abs(dy):
+                    required_direction = Direction.EAST if dx > 0 else Direction.WEST
+                else:
+                    required_direction = Direction.SOUTH if dy > 0 else Direction.NORTH
+                
+                # 2. 敵の現在の向きと必要な向きを比較
+                if enemy.direction != required_direction:
+                    # 方向転換のターン（攻撃なし）
+                    enemy.direction = required_direction
+                    counter_message = " → 敵がプレイヤーの方を向いた"
+                else:
+                    # 既に正しい方向を向いている場合は攻撃
+                    counter_result = combat_system.enemy_attack_player(enemy, player)
+                    if counter_result.success:
+                        counter_damage = counter_result.attacker_damage_dealt
+                        player_defeated = counter_result.attacker_defeated
+                        counter_message = f" → 敵の反撃！{counter_damage}ダメージを受けた"
+                        if player_defeated:
+                            counter_message += "（プレイヤー敗北）"
+                    else:
+                        counter_message = " → 敵の攻撃が届かなかった"
+            
             result = AttackResult(
                 result=CommandResult.SUCCESS,
-                message=f"敵に{actual_damage}ダメージを与えました" + ("（敵を倒した）" if defeated else ""),
+                message=f"敵に{actual_damage}ダメージを与えました" + ("（敵を倒した）" if defeated else "") + counter_message,
                 damage_dealt=actual_damage,
                 target_defeated=defeated,
                 target_hp_remaining=enemy.hp if not defeated else 0,
-                extra_data={"enemy_position": enemy.position}
+                extra_data={
+                    "enemy_position": enemy.position,
+                    "counter_damage": counter_damage,
+                    "player_defeated": player_defeated
+                }
             )
         
         self.executed = True

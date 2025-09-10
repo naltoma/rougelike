@@ -25,6 +25,7 @@ Kiro-style Spec Driven Development implementation using claude code slash comman
 - `google-sheets-integration-v1.2.3`: Google Apps Script Webhook連携・学生間セッションログ共有機能（v1.2.3で完了） - 詳細は [docs/v1.2.3.md](docs/v1.2.3.md) 参照
 - `initial-execution-behavior-v1.2.4`: 初回起動時動作改善 - ステージクリア条件確認・試行回数管理最適化（v1.2.4で完了） - 詳細は [docs/v1.2.4.md](docs/v1.2.4.md) 参照
 - `continue-execution-speed-control-v1.2.5`: Continue実行速度調整機能 - 7段階速度制御・超高速実行対応（v1.2.5で完了） - 詳細は [docs/v1.2.5.md](docs/v1.2.5.md) 参照
+- `attack-system-integration-v1.2.6`: attack機能導入・敵AIカウンター攻撃システム - stage04-06実装・攻撃ベース学習ステージ（v1.2.6で完了） - 詳細は [docs/v1.2.6.md](docs/v1.2.6.md) 参照
 
 ## Development Guidelines
 - Think in English, but generate responses in Japanese (思考は英語、回答の生成は日本語で行うように)
