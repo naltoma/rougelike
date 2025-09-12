@@ -75,6 +75,15 @@ class PickupResult(ExecutionResult):
             self.item_effect = {}
 
 
+@dataclass
+class WaitResult(ExecutionResult):
+    """待機結果の詳細"""
+    enemy_actions_triggered: int = 0
+    
+    def __post_init__(self):
+        super().__post_init__()
+
+
 class Command(ABC):
     """コマンドベースクラス"""
     
@@ -270,46 +279,23 @@ class AttackCommand(Command):
                 # 敵を削除
                 game_state.enemies.remove(enemy)
             
-            # カウンター攻撃処理（敵が生きている場合のみ）
+            # カウンター攻撃処理は _process_enemy_turns で統一処理
+            # AttackCommand での即座の反撃は無効化（重複攻撃を防ぐ）
             counter_message = ""
             counter_damage = 0
             player_defeated = False
             
-            if not defeated and enemy.is_alive():
-                # 敵のカウンター処理：プレイヤーの方向確認と行動決定
-                from .combat_system import get_combat_system
-                combat_system = get_combat_system()
-                
-                # 1. プレイヤーとの位置関係を計算
-                dx = player.position.x - enemy.position.x
-                dy = player.position.y - enemy.position.y
-                
-                # プレイヤーの相対位置に応じて必要な向きを決定
-                if abs(dx) > abs(dy):
-                    required_direction = Direction.EAST if dx > 0 else Direction.WEST
-                else:
-                    required_direction = Direction.SOUTH if dy > 0 else Direction.NORTH
-                
-                # 2. 敵の現在の向きと必要な向きを比較
-                if enemy.direction != required_direction:
-                    # 方向転換のターン（攻撃なし）
-                    enemy.direction = required_direction
-                    counter_message = " → 敵がプレイヤーの方を向いた"
-                else:
-                    # 既に正しい方向を向いている場合は攻撃
-                    counter_result = combat_system.enemy_attack_player(enemy, player)
-                    if counter_result.success:
-                        counter_damage = counter_result.attacker_damage_dealt
-                        player_defeated = counter_result.attacker_defeated
-                        counter_message = f" → 敵の反撃！{counter_damage}ダメージを受けた"
-                        if player_defeated:
-                            counter_message += "（プレイヤー敗北）"
-                    else:
-                        counter_message = " → 敵の攻撃が届かなかった"
+            
+            # メッセージ構築
+            base_message = f"敵に{actual_damage}ダメージを与えました"
+            if defeated:
+                base_message += "（敵を倒した）"
+            else:
+                base_message += " → 敵のターンで反撃があります"
             
             result = AttackResult(
                 result=CommandResult.SUCCESS,
-                message=f"敵に{actual_damage}ダメージを与えました" + ("（敵を倒した）" if defeated else "") + counter_message,
+                message=base_message,
                 damage_dealt=actual_damage,
                 target_defeated=defeated,
                 target_hp_remaining=enemy.hp if not defeated else 0,
@@ -389,6 +375,36 @@ class PickupCommand(Command):
         return "足元のアイテムを取得"
 
 
+class WaitCommand(Command):
+    """待機コマンド"""
+    
+    def execute(self, game_state: GameState) -> WaitResult:
+        """1ターン待機"""
+        # プレイヤーは何もせず1ターンを過ごす
+        # 敵の処理はGameStateManagerの_update_game_state()で行われる
+        
+        result = WaitResult(
+            result=CommandResult.SUCCESS,
+            message="1ターン待機しました",
+            enemy_actions_triggered=0
+        )
+        
+        self.executed = True
+        self.result = result
+        return result
+    
+    def undo(self, game_state: GameState) -> bool:
+        """待機は取り消し不可"""
+        return False
+    
+    def can_undo(self) -> bool:
+        """待機は取り消し不可"""
+        return False
+    
+    def get_description(self) -> str:
+        return "1ターン待機"
+
+
 class CommandInvoker:
     """コマンド実行管理クラス"""
     
@@ -438,8 +454,8 @@ class CommandInvoker:
 
 # エクスポート用
 __all__ = [
-    "Command", "ExecutionResult", "AttackResult", "PickupResult",
+    "Command", "ExecutionResult", "AttackResult", "PickupResult", "WaitResult",
     "CommandResult", "CommandInvoker",
     "TurnLeftCommand", "TurnRightCommand", "MoveCommand", 
-    "AttackCommand", "PickupCommand"
+    "AttackCommand", "PickupCommand", "WaitCommand"
 ]

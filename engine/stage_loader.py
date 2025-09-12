@@ -140,6 +140,29 @@ class StageLoader:
         direction = player_data["direction"]
         if direction not in ["N", "E", "S", "W"]:
             raise StageValidationError(f"player.directionは N/E/S/W のいずれかである必要があります: {direction}")
+        
+        # HP設定の検証（オプション）
+        if "hp" in player_data:
+            hp = player_data["hp"]
+            if not isinstance(hp, int) or hp <= 0:
+                raise StageValidationError("player.hpは正の整数である必要があります")
+        
+        # 最大HP設定の検証（オプション）
+        if "max_hp" in player_data:
+            max_hp = player_data["max_hp"]
+            if not isinstance(max_hp, int) or max_hp <= 0:
+                raise StageValidationError("player.max_hpは正の整数である必要があります")
+        
+        # HPと最大HPの関係性チェック
+        if "hp" in player_data and "max_hp" in player_data:
+            if player_data["hp"] > player_data["max_hp"]:
+                raise StageValidationError("player.hpはplayer.max_hp以下である必要があります")
+        
+        # 攻撃力設定の検証（オプション）
+        if "attack_power" in player_data:
+            attack_power = player_data["attack_power"]
+            if not isinstance(attack_power, int) or attack_power < 0:
+                raise StageValidationError("player.attack_powerは0以上の整数である必要があります")
     
     def _validate_goal(self, goal_data: Dict[str, Any]) -> None:
         """ゴールデータの検証"""
@@ -227,7 +250,7 @@ class StageLoader:
             if not isinstance(allowed_apis, list):
                 raise StageValidationError("constraints.allowed_apisはリスト形式である必要があります")
             
-            valid_apis = ["turn_left", "turn_right", "move", "attack", "pickup", "see"]
+            valid_apis = ["turn_left", "turn_right", "move", "attack", "pickup", "wait", "see"]
             for api in allowed_apis:
                 if api not in valid_apis:
                     raise StageValidationError(f"無効なAPI: {api}. 有効なAPI: {valid_apis}")
@@ -271,6 +294,11 @@ class StageLoader:
         direction_map = {"N": Direction.NORTH, "E": Direction.EAST, "S": Direction.SOUTH, "W": Direction.WEST}
         player_direction = direction_map[player_data["direction"]]
         
+        # プレイヤーのステータス情報の抽出（オプション）
+        player_hp = player_data.get("hp")
+        player_max_hp = player_data.get("max_hp")
+        player_attack_power = player_data.get("attack_power")
+        
         # ゴール情報の抽出
         goal_data = data["goal"]
         goal_position = Position(*goal_data["position"])
@@ -300,6 +328,9 @@ class StageLoader:
             board_size=(width, height),
             player_start=player_start,
             player_direction=player_direction,
+            player_hp=player_hp,
+            player_max_hp=player_max_hp,
+            player_attack_power=player_attack_power,
             enemies=enemies,
             items=items,
             walls=walls,

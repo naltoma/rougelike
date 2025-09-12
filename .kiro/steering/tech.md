@@ -6,21 +6,25 @@
 - **配布方式**: conda環境配布、手動セットアップによる学習効果
 
 ## Frontend
-- **GUI v1.2.3**: pygame（デフォルト表示・実行制御対応・Critical Fixes完了・セッションログ統合完了・Webhook連携対応）
+- **GUI v1.2.6**: pygame（デフォルト表示・実行制御対応・Critical Fixes完了・セッションログ統合完了・Webhook連携対応・Attack System統合完了）
   - 2D描画、5x5〜10x10グリッド表示
   - キャラクター・敵・アイテム・壁の視覚化
   - 大型敵（2x2, 3x3）・特殊敵（2x3）対応
   - **✅ 実行制御パネル**: Step/Continue/Pause/Stopボタン（v1.2.1で安定化完了）
   - **✅ 一時停止機能**: solve()実行前の学習者確認
   - **✅ キーボードショートカット**: Space/Enter/Esc対応
-  - **✅ GUI最適化**: 900x505px画面（Player Info凡例完全表示、v1.2.2で完了）
+  - **✅ GUI最適化**: 900x505px→540px高さ（Enemy Info Panel対応、v1.2.6で完了）
+  - **⚔️ 敵インデックス表示**: 複数敵の識別（1,2,3...）マップ上と右サイドバーに表示
+  - **⚔️ Enemy Info Panel**: 敵のHP/攻撃力情報表示（v1.2.6新機能）
 - **CUI**: テキストベース表示（学習目的・デバッグ用）
   - 同一ロジック、切替可能設計
 - **API設計**: 直感的関数名、向き制御重視
   ```python
   turn_left(), turn_right()  # 向き変更
   move()                     # 正面移動
-  attack(), pickup()         # アクション
+  attack()                   # 攻撃 (v1.2.6完全統合)
+  pickup()                   # アイテム取得 (v1.2.7予定)
+  wait()                     # 待機 (v1.2.7予定)
   see() -> dict             # 状況取得
   ```
 
@@ -88,6 +92,23 @@
   - 速度設定エラーの適切な処理
   - フォールバック機能とエラー回復
 
+## ⚔️ v1.2.6 Attack System Integration Components (COMPLETED)
+- **Attack System統合**: プレイヤー攻撃機能の完全実装
+  - attack()API完全統合とダメージ計算統一
+  - プレイヤー攻撃力30統一（表示値と実際値一致）
+  - 敵HP設定統一（max_hp = hp）
+- **敵AIカウンター攻撃システム**: 攻撃を受けた敵の反撃機能
+  - 方向転換機能（攻撃前にプレイヤー方向を向く）
+  - ターン制戦闘（方向転換と攻撃を別ターンに分離）
+- **Combat System強化**: 戦闘ロジックの最適化
+  - ダメージ表示と実際のダメージ値の完全一致
+  - 敵HP管理とステージファイル連動
+- **Stage04-06追加**: 戦闘ベース学習ステージ
+  - 段階的攻撃学習（基本攻撃→複数回攻撃→長期戦闘）
+- **Session Log Code Lines計算改善**: 学習データ純度向上
+  - フレームワーク必須行除外（def, from, set_auto_render, print()）
+  - 実際の学習コード行のみ記録
+
 ## 🔗 v1.2.3 Google Apps Script Webhook Integration Components (COMPLETED)
 - **WebhookUploader**: Google Apps Script Webhook送信機能
   - HTTP POST通信による無料Webhook連携
@@ -153,11 +174,11 @@ conda activate rougelike
 pip install -r requirements.txt
 
 # 実行
-python main.py          # GUI v1.2.5 mode（デフォルト・7段階速度制御・初回確認モード・Webhook対応）
+python main.py          # GUI v1.2.6 mode（デフォルト・7段階速度制御・初回確認モード・Webhook対応・Attack System統合）
 python main.py --cui    # CUI mode
 python main.py --gui    # 明示的GUI指定
 python student_example.py  # 学生サンプル実行
-# v1.2.5: 7段階速度制御対応・初回確認モード統合
+# v1.2.6: Attack System統合・Enemy Info Panel・敵インデックス表示
 # ENABLE_LOGGING = False (確認モード) / True (実行モード)
 
 # セッションログ確認（v1.2.2）

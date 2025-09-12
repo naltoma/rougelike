@@ -1,0 +1,74 @@
+id: stage07
+title: 武器取得ステージ
+description: 武器を取得して敵を倒すステージです。強力な敵との戦闘では武器が必要不可欠です。pickup()で武器を取得してから攻撃しましょう。
+
+board:
+  size: [7, 5]
+  grid:
+    - "......."
+    - ".#.#.#."
+    - "......."
+    - ".#.#.#."
+    - "......."
+  legend:
+    "#": "wall"
+    ".": "empty"
+    "P": "player"
+    "G": "goal"
+    "E": "enemy"
+    "W": "weapon"
+
+player:
+  start: [0, 2]
+  direction: "E"
+  hp: 100
+  max_hp: 100
+
+goal:
+  position: [6, 2]
+
+enemies:
+  - id: "warrior1"
+    type: "orc"
+    position: [4, 2]
+    hp: 31
+    attack_power: 100
+    behavior: "static"
+
+items:
+  - id: "sword1"
+    type: "weapon"
+    name: "鋼の剣"
+    position: [2, 2]
+    effect:
+      attack: 35
+    auto_equip: true
+
+constraints:
+  max_turns: 20
+  allowed_apis: ["turn_left", "turn_right", "move", "attack", "pickup", "wait", "see"]
+
+victory_conditions:
+  - type: "defeat_all_enemies"
+  - type: "reach_goal"
+
+# 学習目標とヒント
+learning_objectives:
+  - "pickup()関数を使って武器を取得する方法を学ぶ"
+  - "武器効果による攻撃力強化を理解する"
+  - "強敵との戦闘における装備の重要性を学ぶ"
+  - "戦略的アイテム取得とタイミングを身に付ける"
+
+hints:
+  - "⚠️ 重要：武器なしでは絶対に敵を倒せません！"
+  - "プレイヤーは東向き(E)、位置[0,2]、HP100、攻撃力30で開始"
+  - "敵は位置[4,2]、HP31、攻撃力100の強敵（1撃でプレイヤー撃破）"
+  - "🎯 戦略：武器取得が生存の鍵です"
+  - "まず move()を2回実行して武器[2,2]に到達"
+  - "pickup()で鋼の剣を取得すると攻撃力30→65に強化"
+  - "武器未装備時：攻撃力30では敵HP31を倒せない（29ダメージ）"
+  - "武器装備時：攻撃力65で敵HP31を1撃で倒せる（31ダメージ）"
+  - "敵は正面からのみ攻撃可能（壁で側面・背後をブロック）"
+  - "敵の攻撃力100は致命的（プレイヤーHP100を1撃撃破）"
+  - "move()×2 → pickup() → move()×2 → attack() → move()×2"
+  - "武器取得せずに敵に近づくと即座に敗北します"

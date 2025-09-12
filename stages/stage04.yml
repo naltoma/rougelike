@@ -28,7 +28,7 @@ enemies:
   - id: "goblin1"
     type: "goblin"
     position: [2, 0]
-    hp: 10
+    hp: 30
     behavior: "static"
 
 items: []

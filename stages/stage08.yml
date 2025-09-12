@@ -1,0 +1,65 @@
+id: stage08
+title: ループ練習ステージ
+description: ループ処理を学ぶステージです。プレイヤーは北向きで開始し、左下のゴールを目指します。turn_right()とmove()の組み合わせを繰り返すループパターンでクリアできます。
+
+board:
+  size: [10, 10]
+  grid:
+    - ".........."
+    - "#########."
+    - "#.......#."
+    - "#.......#."
+    - "#.......#."
+    - "#.......#."
+    - "#.......#."
+    - "#.......#."
+    - "#.......#."
+    - ".........."
+  legend:
+    "#": "wall"
+    ".": "empty"
+    "P": "player"
+    "G": "goal"
+    "E": "enemy"
+
+player:
+  start: [0, 0]
+  direction: "N"
+  hp: 100
+  max_hp: 100
+
+goal:
+  position: [0, 9]
+
+enemies: []
+
+items: []
+
+constraints:
+  max_turns: 100
+  allowed_apis: ["turn_left", "turn_right", "move", "wait", "see"]
+
+victory_conditions:
+  - type: "reach_goal"
+
+# 学習目標とヒント
+learning_objectives:
+  - "for文を使った繰り返し処理を学ぶ"
+  - "while文による条件付きループを理解する"
+  - "大量の同じ処理を効率的にコード化する方法を習得"
+  - "ループを使ったコードの簡潔性と可読性を体験"
+  - "移動パターンの最適化とコードの保守性を学ぶ"
+
+hints:
+  - "プレイヤーは[0,0]から北向き(N)で開始し、左下[0,9]がゴールです"
+  - "左の列(x=0)のy=1〜8には壁があるため、直接南には進めません"
+  - "基本パターン: turn_right() → 9回move() を3回繰り返す"
+  - "💡 推奨クリア手順:"
+  - "  1. turn_right() + move()×9 (東に移動 [0,0]→[9,0])"  
+  - "  2. turn_right() + move()×9 (南に移動 [9,0]→[9,9])"
+  - "  3. turn_right() + move()×9 (西に移動 [9,9]→[0,9] ゴール到達)"
+  - "for文の使用例: for i in range(3): turn_right(); [for j in range(9): move()]"
+  - "while文の使用例: count=0; while count<3: turn_right(); [move 9回]; count+=1"
+  - "ループなしでは turn_right(), move()×9 を3セット = 30行のコードが必要"
+  - "ループありなら数行で同じ処理が可能です"
+  - "see()で現在位置と向きを確認できます"

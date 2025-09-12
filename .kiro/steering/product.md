@@ -27,13 +27,13 @@ Python初学者向け演習フレームワーク - ローグライク風ステ�
 - **教員支援**: 自動ログ収集・分析による学習状況把握
 - **高度テストシステム**: pytest対応、88.9%成功率、失敗分析・再実行機能
 
-## Current Version: v1.2.5 (Continue Execution Speed Control Complete)
-- **コアエンジン**: 25ファイル (拡張) - 完全実装済み + v1.2.5機能
+## Current Version: v1.2.6 (Attack System Integration Complete)
+- **コアエンジン**: 25ファイル (拡張) - 完全実装済み + v1.2.6機能
 - **テストスイート**: 32ファイル - pytest統合、マーカー対応
 - **品質評価**: 優良⭐ (機能カバレッジ100%, テスト成功率88.9%)
 - **高機能テスト**: 失敗分析、再実行、並列実行、カバレッジ対応
-- **✅ v1.2.5完了機能**: 7段階速度制御（x1〜x50）、超高速デバッグ実行、リアルタイム速度調整
-- **📋 v1.2.6予定**: attack機能導入（stage04-06実装、敵AIカウンター攻撃システム）
+- **✅ v1.2.6完了機能**: attack機能統合、敵AIカウンター攻撃、Stage04-06追加、戦闘ベース学習
+- **📋 v1.2.7予定**: pickup機能導入（武器取得システム）・wait機能導入・敵AI移動ルーチン（Stage07-09）
 
 ## Core Implemented Features  
 - GUI（pygame）+ CUI両対応、デフォルトGUI
@@ -99,11 +99,24 @@ Python初学者向け演習フレームワーク - ローグライク風ステ�
 - **リアルタイム速度変更**: 実行中の動的な速度調整機能
 - **Speed Control Error Handler**: 速度制御専用エラー処理システム
 
-## 📋 v1.2.6 Attack System Integration Features (PLANNED)
-- **attack機能導入**: キャラクターの攻撃アクション実装
-- **敵AIカウンター攻撃**: 攻撃を受けた敵の反撃システム
-- **stage04-06実装**: 攻撃ベースの新ステージ（1回攻撃・3回攻撃・HP10倍攻撃）
-- **敵の方向転換システム**: 攻撃を受けた敵の自動方向調整
+## ⚔️ v1.2.6 Attack System Integration Features (COMPLETED)
+- **attack機能統合**: プレイヤー攻撃アクションの完全実装・統合
+- **敵AIカウンター攻撃システム**: 攻撃を受けた敵の反撃機能（方向転換＋攻撃）
+- **Stage04-06追加**: 戦闘ベース学習ステージ
+  - Stage04: HP10敵、基本攻撃習得
+  - Stage05: HP90敵、3回攻撃戦略習得
+  - Stage06: HP300敵、10倍攻撃長期戦習得
+- **GUI改善**: 敵インデックス表示、Enemy Info Panel、ウィンドウサイズ自動調整
+- **Session Log強化**: コード行数計算改善（フレームワーク必須行除外）
+
+## 📋 v1.2.7 Pickup & Wait System Features (PLANNED)
+- **pickup機能導入**: 武器取得システム実装
+- **wait機能導入**: その場で1ターン待機機能
+- **Stage07-09実装**: pickup・wait活用ステージ
+  - Stage07: 武器取得による攻撃力強化学習
+  - Stage08: ループ活用のためのステージ拡大
+  - Stage09: 敵AI移動ルーチンと視界回避戦略
+- **敵AI移動システム**: 巡回・追跡AI導入
 
 ## Advanced Testing Framework
 - **pytest統合**: 高機能テスト実行と分析

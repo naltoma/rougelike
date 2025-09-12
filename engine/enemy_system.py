@@ -98,6 +98,12 @@ class AdvancedEnemy(Enemy):
         self.anger_level = 0.0
         self.memory: Dict[str, Any] = {}
         
+        # v1.2.7 pickup-wait system 拡張フィールド
+        self.patrol_path: List[Position] = []
+        self.vision_range: int = 2
+        self.current_patrol_index: int = 0
+        self.movement_mode: str = "patrol"  # "patrol" or "chase"
+        
         # 行動履歴
         self.action_history: List[str] = []
         self.damage_taken_history: List[int] = []
@@ -124,17 +130,31 @@ class AdvancedEnemy(Enemy):
         self._update_state_logic(distance_to_player, player_visible)
     
     def _update_state_logic(self, distance: float, player_visible: bool) -> None:
-        """状態遷移ロジック"""
+        """状態遷移ロジック - v1.2.7 視界検出拡張"""
+        # v1.2.7 拡張: 新しいvision_range検出
+        player_in_vision = self.detect_player(self.last_seen_player) if self.last_seen_player else player_visible
+        
         # 攻撃範囲内
         if distance <= self.ai_config.attack_range and player_visible:
             self.current_state = EnemyState.ATTACKING
+            self.movement_mode = "chase"
         
-        # 検出範囲内
-        elif distance <= self.ai_config.detection_range and player_visible:
+        # 検出範囲内（従来のdetection_range または新しいvision_range）
+        elif (distance <= self.ai_config.detection_range and player_visible) or player_in_vision:
             if self.ai_config.behavior_pattern in [BehaviorPattern.GUARD, BehaviorPattern.HUNTER]:
                 self.current_state = EnemyState.CHASING
+                self.movement_mode = "chase"
+            elif self.ai_config.behavior_pattern == BehaviorPattern.PATROL:
+                # 巡回敵の場合、プレイヤー検出時は追跡モードに切り替え
+                if player_in_vision:
+                    self.current_state = EnemyState.CHASING
+                    self.movement_mode = "chase"
+                else:
+                    self.current_state = EnemyState.PATROLLING
+                    self.movement_mode = "patrol"
             elif self.ai_config.behavior_pattern == BehaviorPattern.RETREAT and self.hp < self.max_hp * 0.3:
                 self.current_state = EnemyState.RETREATING
+                self.movement_mode = "retreat"
             else:
                 self.current_state = EnemyState.ALERT
         
@@ -142,8 +162,10 @@ class AdvancedEnemy(Enemy):
         else:
             if self.ai_config.behavior_pattern == BehaviorPattern.PATROL:
                 self.current_state = EnemyState.PATROLLING
+                self.movement_mode = "patrol"
             else:
                 self.current_state = EnemyState.IDLE
+                self.movement_mode = "idle"
     
     def get_next_action(self, player_position: Position, board) -> Dict[str, Any]:
         """次の行動を決定"""
@@ -205,28 +227,60 @@ class AdvancedEnemy(Enemy):
         return {"type": "none", "direction": None, "target": None}
     
     def _get_patrol_action(self, board) -> Dict[str, Any]:
-        """巡回行動"""
-        if not self.ai_config.patrol_points:
-            return {"type": "none", "direction": None, "target": None}
-        
-        # 現在の巡回ポイントを取得
-        current_target = self.ai_config.patrol_points[self.patrol_index]
-        
-        # 到達したら次のポイントへ
-        if self.position == current_target:
-            self.patrol_index = (self.patrol_index + 1) % len(self.ai_config.patrol_points)
+        """巡回行動 - v1.2.7 拡張"""
+        # 古いpatrol_pointsシステムとの互換性維持
+        if self.ai_config.patrol_points:
             current_target = self.ai_config.patrol_points[self.patrol_index]
+            
+            # 到達したら次のポイントへ
+            if self.position == current_target:
+                self.patrol_index = (self.patrol_index + 1) % len(self.ai_config.patrol_points)
+                current_target = self.ai_config.patrol_points[self.patrol_index]
+            
+            # 巡回ポイントに向かって移動
+            next_position = self._find_next_position_to_target(current_target, board)
+            
+            if next_position and next_position != self.position:
+                direction = self._get_direction_to_position(next_position)
+                return {
+                    "type": "move",
+                    "direction": direction,
+                    "target": next_position
+                }
         
-        # 巡回ポイントに向かって移動
-        next_position = self._find_next_position_to_target(current_target, board)
-        
-        if next_position and next_position != self.position:
-            direction = self._get_direction_to_position(next_position)
-            return {
-                "type": "move",
-                "direction": direction,
-                "target": next_position
-            }
+        # v1.2.7 新しいpatrol_pathシステム
+        elif self.patrol_path:
+            current_target = self.get_next_patrol_position()
+            if current_target is None:
+                return {"type": "none", "direction": None, "target": None}
+            
+            # 到達したら次のポイントへ
+            if self.position == current_target:
+                self.advance_patrol()
+                current_target = self.get_next_patrol_position()
+            
+            if current_target and current_target != self.position:
+                # シンプルな1マス移動計算
+                dx = current_target.x - self.position.x
+                dy = current_target.y - self.position.y
+                
+                # 最も近い方向を決定
+                if abs(dx) > abs(dy):
+                    direction = Direction.EAST if dx > 0 else Direction.WEST
+                else:
+                    direction = Direction.SOUTH if dy > 0 else Direction.NORTH
+                
+                # 移動先位置計算
+                offset_x, offset_y = direction.get_offset()
+                next_position = Position(self.position.x + offset_x, self.position.y + offset_y)
+                
+                # 移動可能性チェック
+                if board.is_passable(next_position):
+                    return {
+                        "type": "move",
+                        "direction": direction,
+                        "target": next_position
+                    }
         
         return {"type": "none", "direction": None, "target": None}
     
@@ -406,6 +460,26 @@ class AdvancedEnemy(Enemy):
         """スタン効果適用"""
         self.stun_duration = duration
     
+    def get_next_patrol_position(self) -> Optional[Position]:
+        """次の巡回位置を取得"""
+        if not self.patrol_path:
+            return None
+        
+        if self.current_patrol_index >= len(self.patrol_path):
+            self.current_patrol_index = 0
+        
+        return self.patrol_path[self.current_patrol_index]
+    
+    def advance_patrol(self) -> None:
+        """巡回インデックスを進める"""
+        if self.patrol_path:
+            self.current_patrol_index = (self.current_patrol_index + 1) % len(self.patrol_path)
+    
+    def detect_player(self, player_position: Position) -> bool:
+        """プレイヤー検出（vision_range内判定）"""
+        distance = abs(self.position.x - player_position.x) + abs(self.position.y - player_position.y)
+        return distance <= self.vision_range
+    
     def get_status_info(self) -> Dict[str, Any]:
         """状態情報取得"""
         return {
@@ -416,7 +490,10 @@ class AdvancedEnemy(Enemy):
             "anger_level": self.anger_level,
             "stunned": self.stun_duration > 0,
             "position": (self.position.x, self.position.y),
-            "direction": self.direction.value
+            "direction": self.direction.value,
+            "movement_mode": self.movement_mode,
+            "vision_range": self.vision_range,
+            "patrol_progress": f"{self.current_patrol_index}/{len(self.patrol_path)}" if self.patrol_path else "0/0"
         }
     
     # v1.2.6: カウンター攻撃システム

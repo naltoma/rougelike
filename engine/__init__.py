@@ -152,6 +152,18 @@ class Enemy(Character):
     enemy_type: EnemyType = EnemyType.NORMAL
     behavior_pattern: str = "static"
     is_angry: bool = False
+    vision_range: int = 3  # 視野範囲（マス数）
+    vision_angle: int = 90  # 視野角度（度）前方90度
+    alerted: bool = False  # プレイヤーを発見したかどうか
+    patrol_path: List[Position] = None  # 巡回パス
+    current_patrol_index: int = 0  # 現在の巡回インデックス
+    alert_cooldown: int = 0  # 警戒状態のクールダウン（ターン数）
+    last_seen_player: Position = None  # 最後にプレイヤーを見た位置
+    
+    def __post_init__(self):
+        super().__post_init__()
+        if self.patrol_path is None:
+            self.patrol_path = []
     
     def get_size(self):
         """敵のサイズを取得 (width, height)"""
@@ -176,6 +188,95 @@ class Enemy(Character):
             for dy in range(height):
                 positions.append(Position(self.position.x + dx, self.position.y + dy))
         return positions
+    
+    def can_see_player(self, player_position: Position, board=None) -> bool:
+        """プレイヤーを視野範囲内で視認できるかどうか（get_vision_cellsと完全に同じ基準を使用）"""
+        vision_cells = self.get_vision_cells(board=board)
+        result = player_position in vision_cells
+        return result
+    
+    def get_vision_cells(self, board=None) -> List[Position]:
+        """視野範囲内のセル一覧を取得（壁による視線遮蔽を考慮）"""
+        cells = []
+        
+        for distance in range(1, self.vision_range + 1):
+            for offset in range(-distance, distance + 1):
+                if self.direction == Direction.NORTH:
+                    target_pos = Position(self.position.x + offset, self.position.y - distance)
+                elif self.direction == Direction.SOUTH:
+                    target_pos = Position(self.position.x + offset, self.position.y + distance)
+                elif self.direction == Direction.EAST:
+                    target_pos = Position(self.position.x + distance, self.position.y + offset)
+                elif self.direction == Direction.WEST:
+                    target_pos = Position(self.position.x - distance, self.position.y + offset)
+                else:
+                    continue
+                
+                # 視野角度内かチェック
+                if abs(offset) <= distance:  # 90度視野角の近似
+                    # 壁による視線遮蔽をチェック
+                    has_los = board is None or self._has_line_of_sight(target_pos, board)
+                    if has_los:
+                        cells.append(target_pos)
+        
+        return cells
+    
+    def _has_line_of_sight(self, target_pos: Position, board) -> bool:
+        """指定位置への視線が遮られていないかチェック"""
+        # 簡易的な視線判定：直線上に壁があるかチェック
+        start_x, start_y = self.position.x, self.position.y
+        end_x, end_y = target_pos.x, target_pos.y
+        
+        # ブレゼンハムアルゴリズムの簡易版で視線をトレース
+        dx = abs(end_x - start_x)
+        dy = abs(end_y - start_y)
+        
+        x, y = start_x, start_y
+        step_x = 1 if start_x < end_x else -1
+        step_y = 1 if start_y < end_y else -1
+        
+        if dx > dy:
+            err = dx / 2.0
+            while x != end_x:
+                x += step_x
+                err -= dy
+                if err < 0:
+                    y += step_y
+                    err += dx
+                # 中間点が壁かチェック（目標地点は除く）
+                if x != end_x or y != end_y:
+                    check_pos = Position(x, y)
+                    if check_pos in board.walls:
+                        return False
+        else:
+            err = dy / 2.0
+            while y != end_y:
+                y += step_y
+                err -= dx
+                if err < 0:
+                    x += step_x
+                    err += dy
+                # 中間点が壁かチェック（目標地点は除く）
+                if x != end_x or y != end_y:
+                    check_pos = Position(x, y)
+                    if check_pos in board.walls:
+                        return False
+        
+        return True
+    
+    def get_next_patrol_position(self) -> Optional[Position]:
+        """次の巡回位置を取得"""
+        if not self.patrol_path:
+            return None
+        
+        # 次のインデックスを計算（現在位置の次の位置を目標とする）
+        next_index = (self.current_patrol_index + 1) % len(self.patrol_path)
+        return self.patrol_path[next_index]
+    
+    def advance_patrol(self) -> None:
+        """巡回インデックスを進める"""
+        if self.patrol_path:
+            self.current_patrol_index = (self.current_patrol_index + 1) % len(self.patrol_path)
 
 @dataclass
 class Item:
@@ -302,6 +403,9 @@ class Stage:
     goal_position: Optional[Position]
     allowed_apis: List[str]
     constraints: Dict[str, Any]
+    player_hp: Optional[int] = None  # ステージ固有のプレイヤーHP（Noneの場合はデフォルト値を使用）
+    player_max_hp: Optional[int] = None  # ステージ固有の最大HP
+    player_attack_power: Optional[int] = None  # ステージ固有の攻撃力
     
     def __post_init__(self):
         """バリデーション"""

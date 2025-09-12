@@ -10,7 +10,8 @@ rougelike/
 │       └── gui-critical-fixes-v1.2.1/  # 🆕 v1.2.1 Critical button fixes spec
 ├── .claude/            # Claude Code commands
 ├── docs/               # Project documentation
-│   ├── v1.2.6.md       # 📋 v1.2.6 TODOs (attack機能導入・敵AIカウンター攻撃)
+│   ├── v1.2.7.md       # 📋 v1.2.7 TODOs (pickup機能導入・wait機能・敵AI移動ルーチン)
+│   ├── v1.2.6.md       # ⚔️ v1.2.6 Attack System Integration documentation (COMPLETED)
 │   ├── v1.2.5.md       # 🚀 v1.2.5 Continue Execution Speed Control documentation (COMPLETED)
 │   ├── v1.2.4.md       # 📋 v1.2.4 Initial Execution Behavior Enhancement documentation (COMPLETED)
 │   ├── v1.2.3.md       # 🔗 v1.2.3 Google Apps Script Webhook Integration documentation (COMPLETED)
@@ -21,11 +22,11 @@ rougelike/
 │   ├── teacher_setup_guide.md   # 教員向けWebhookセットアップガイド
 │   ├── student_setup_guide.md   # 学生向けWebhookセットアップガイド
 │   └── v0_1st_plan.md  # Original planning documents
-├── engine/             # Core game engine (40+ files + v1.2.5 speed control system)
-├── stages/             # YAML stage definitions
+├── engine/             # Core game engine (40+ files + v1.2.6 attack system integration)
+├── stages/             # YAML stage definitions (stage01-06 implemented)
 ├── tests/              # Comprehensive test suite (32+ files)
 ├── temp/               # Temporary files and screenshots
-├── main.py             # Entry point (v1.2.5 GUI + 7-stage speed control + webhook ready)
+├── main.py             # Entry point (v1.2.6 GUI + attack system + enemy info panel)
 ├── student_example.py  # Student sample code
 ├── upload_webhook.py   # Webhook upload tool (v1.2.3)
 ├── test_multiple_students.py  # Multiple students test tool (v1.2.3)
@@ -40,7 +41,7 @@ rougelike/
 
 ## Subdirectory Structures
 
-### `/engine/` - Core Game Engine (v1.2.5 - Continue Execution Speed Control Complete)
+### `/engine/` - Core Game Engine (v1.2.6 - Attack System Integration Complete)
 ```
 engine/
 ├── __init__.py                 # Core data models (9,705 bytes)
@@ -127,8 +128,11 @@ stages/
 ├── stage01.yml         # Move-only (2-3 steps)
 ├── stage02.yml         # Turn/move (3-4 turns)
 ├── stage03.yml         # Turn/move + walls (5-10 turns)
-├── stage04-08.yml      # Attack + pickup phases
-├── stage09-16.yml      # Advanced stages (10x10, enemies, items)
+├── stage04.yml         # ⚔️ Basic attack (HP10 enemy) - v1.2.6 COMPLETED
+├── stage05.yml         # ⚔️ 3-attack strategy (HP90 enemy) - v1.2.6 COMPLETED
+├── stage06.yml         # ⚔️ 10-attack long battle (HP300 enemy) - v1.2.6 COMPLETED
+├── stage07-09.yml      # 📋 Pickup + wait phases - v1.2.7 PLANNED
+├── stage10-16.yml      # Advanced stages (10x10, enemies, items)
 └── random/             # Random generation templates
     ├── R1-movement.yml
     ├── R2-attack.yml
@@ -189,6 +193,13 @@ Stage Description Display -> StageDescriptionRenderer -> GUI Understanding Phase
 Mode Switch (ENABLE_LOGGING) -> ConditionalSessionLogger -> Selective Logging
      ↓                           ↓                              ↓
 Execution Mode Entry -> Normal solve() Flow -> Session Logging
+
+⚔️ v1.2.6 Attack System Integration Flow:
+Player attack() -> Combat System -> Enemy Counter-Attack
+     ↓                   ↓                    ↓
+Damage Calculation -> Enemy HP Update -> Direction Change + Attack
+     ↓                   ↓                    ↓
+GUI Enemy Info Panel -> Real-time HP Display -> Turn-based Combat
 ```
 
 ## File Naming Conventions
@@ -273,9 +284,9 @@ from engine.renderer import GuiRenderer, CuiRenderer
 4. **Student API**: Update `/engine/api.py` if needed
 5. **Documentation**: Update README.md and `/docs/`
 
-## Testing Strategy (v1.2.5 - pytest + Continue Execution Speed Control Validated)
-- **Comprehensive Coverage**: 32+ test files covering all 40+ engine components (including v1.2.5)  
-- **Test Success Rate**: 88.9% (maintained through v1.2.5 integration)
+## Testing Strategy (v1.2.6 - pytest + Attack System Integration Validated)
+- **Comprehensive Coverage**: 32+ test files covering all 40+ engine components (including v1.2.6)  
+- **Test Success Rate**: 88.9% (maintained through v1.2.6 integration)
 - **pytest Integration**: Full pytest framework with markers and plugins
 - **Test Categories**:
   - Unit tests: Isolated component testing
@@ -287,7 +298,8 @@ from engine.renderer import GuiRenderer, CuiRenderer
   - **✅ v1.2.2 tests**: Session logging integration validation, stage-specific directory testing (COMPLETED)
   - **✅ v1.2.3 tests**: Webhook integration testing, Google Apps Script communication validation (COMPLETED)
   - **✅ v1.2.4 tests**: Initial confirmation mode validation, stage description rendering, conditional session logging (COMPLETED)
-  - **🚀 v1.2.5 tests**: 7-stage speed control validation, ultra high-speed execution testing, speed control error handling (COMPLETED)
+  - **✅ v1.2.5 tests**: 7-stage speed control validation, ultra high-speed execution testing, speed control error handling (COMPLETED)
+  - **⚔️ v1.2.6 tests**: Attack system integration testing, enemy counter-attack validation, stage04-06 testing (COMPLETED)
 - **Advanced Features**:
   - Test markers: unit/integration/gui classification
   - Failed test analysis and re-run commands
@@ -295,4 +307,4 @@ from engine.renderer import GuiRenderer, CuiRenderer
   - Coverage reporting with pytest-cov
   - HTML/JSON test reports
 - **Quality Assurance**: Automated quality metrics and test-driven development
-- **✅ v1.2.5 Test Coverage**: Enhanced 7-stage speed control manager, ultra high-speed controller, speed control error handling (COMPLETED)
+- **⚔️ v1.2.6 Test Coverage**: Attack system integration, combat system testing, enemy AI counter-attack validation, stage04-06 testing (COMPLETED)

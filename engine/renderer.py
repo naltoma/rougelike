@@ -275,6 +275,8 @@ class GuiRenderer(Renderer):
             'grid': (200, 200, 200),            # 薄いグレー（グリッド線）
             'text': (0, 0, 0),                  # 黒（テキスト）
             'text_bg': (255, 255, 255),         # 白（テキスト背景）
+            'vision_normal': (255, 100, 100),   # 敵視野（薄い赤）- 敵が非警戒状態の視野範囲
+            'vision_alerted': (255, 50, 50),    # 警戒中敵視野（濃い赤）- プレイヤー発見後の警戒状態視野
         }
         
         # UI設定（文字省略防止のため大幅拡大）
@@ -290,6 +292,7 @@ class GuiRenderer(Renderer):
         self.show_grid = True
         self.show_coordinates = False
         self.debug_mode = False
+        self.show_enemy_vision = True  # 敵の視野を常に表示する
         
         # 🚀 v1.2.5: 7段階速度制御対応UI設定
         self.control_panel_height = 90  # 3段構成に拡張（55→90）
@@ -462,6 +465,10 @@ class GuiRenderer(Renderer):
                     text_rect = coord_text.get_rect()
                     text_rect.topleft = (cell_x + 2, cell_y + 2)
                     self.screen.blit(coord_text, text_rect)
+        
+        # 敵の視野範囲を描画（半透明オーバーレイ）
+        if self.show_enemy_vision:
+            self._draw_enemy_vision(game_state, start_x, start_y)
         
         # プレイヤーの向きを矢印で表示
         self._draw_player_direction(game_state.player, start_x, start_y)
@@ -649,12 +656,30 @@ class GuiRenderer(Renderer):
             ("■", self.colors['item'], "Item"),
             ("■", self.colors['forbidden'], "Blocked"),
             ("■", self.colors['empty'], "Empty"),
+            ("▢", self.colors['vision_normal'], "Enemy Vision"),
+            ("▦", self.colors['vision_alerted'], "Alert Vision"),
         ]
         
         for symbol, color, description in legend_items:
             # カラーボックスを描画
             color_rect = pygame.Rect(sidebar_x + 20, y_offset + 2, 12, 12)
-            pygame.draw.rect(self.screen, color, color_rect)
+            
+            # 視野系の色は半透明効果を表現
+            if description in ["Enemy Vision", "Alert Vision"]:
+                # 背景（白）を先に描画
+                pygame.draw.rect(self.screen, (255, 255, 255), color_rect)
+                # 半透明サーフェスを作成
+                vision_surface = pygame.Surface((12, 12))
+                vision_surface.set_alpha(80)  # マップと同じ透明度
+                vision_surface.fill(color)
+                self.screen.blit(vision_surface, color_rect.topleft)
+                
+                # Alert Visionの場合は太い枠線を追加
+                if description == "Alert Vision":
+                    pygame.draw.rect(self.screen, (200, 0, 0), color_rect, 2)  # 濃い赤の太い枠線
+            else:
+                pygame.draw.rect(self.screen, color, color_rect)
+            
             pygame.draw.rect(self.screen, self.colors['text'], color_rect, 1)
             
             # 説明テキスト
@@ -723,6 +748,11 @@ class GuiRenderer(Renderer):
     
     def _handle_events(self) -> None:
         """pygame イベントを処理（EventProcessingEngine使用で信頼性向上）"""
+        # メインスレッドチェック（NSInternalInconsistencyException回避）
+        import threading
+        if threading.current_thread() is not threading.main_thread():
+            return  # バックグラウンドスレッドからの呼び出しは無視
+            
         pygame_events = pygame.event.get()
         
         # システム終了イベントの個別処理
@@ -740,6 +770,9 @@ class GuiRenderer(Renderer):
                     self.show_grid = not self.show_grid
                 elif event.key == pygame.K_F3:
                     self.show_coordinates = not self.show_coordinates
+                elif event.key == pygame.K_F4:
+                    self.show_enemy_vision = not self.show_enemy_vision
+                    print(f"🔧 敵視野表示: {'ON' if self.show_enemy_vision else 'OFF'}")
         
         # EventProcessingEngineでマウス・キーボードイベントを処理
         mouse_events = self.event_processing_engine.process_mouse_events(pygame_events)
@@ -812,6 +845,11 @@ class GuiRenderer(Renderer):
         # 結果表示の待機
         waiting = True
         while waiting:
+            # メインスレッドチェック（NSInternalInconsistencyException回避）
+            import threading
+            if threading.current_thread() is not threading.main_thread():
+                break  # バックグラウンドスレッドからの呼び出しは終了
+                
             for event in pygame.event.get():
                 if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
                     waiting = False
@@ -832,6 +870,7 @@ class GuiRenderer(Renderer):
         print("  F1: デバッグモード切り替え")
         print("  F2: グリッド表示切り替え")
         print("  F3: 座標表示切り替え")
+        print("  F4: 敵視野表示切り替え")
         print("  ESC: 終了")
         print()
     
@@ -1210,7 +1249,14 @@ class GuiRenderer(Renderer):
                 if step_result and step_result.success:
                     print(f"✅ ステップ実行成功 ({step_result.execution_time_ms:.1f}ms)")
                 else:
-                    print("❌ ステップ実行失敗")
+                    error_msg = step_result.error_message if step_result else "step_result is None"
+                    print(f"❌ ステップ実行失敗: {error_msg}")
+                    # Reset後の状態を詳細確認
+                    if hasattr(self.execution_controller, 'state'):
+                        print(f"🔍 ExecutionController状態: mode={self.execution_controller.state.mode}")
+                    if hasattr(self, '_global_api') and hasattr(self._global_api, 'game_manager'):
+                        gm_state = "initialized" if self._global_api.game_manager else "None"
+                        print(f"🔍 GameManager状態: {gm_state}")
                     
             elif action == 'continue':
                 print("▶️ GUI: Continue button clicked")
@@ -1315,12 +1361,66 @@ class GuiRenderer(Renderer):
         # pygameのQUITイベントを生成してメインループを終了
         try:
             import pygame
+            import threading
+            # メインスレッドチェック（NSInternalInconsistencyException回避）
+            if threading.current_thread() is not threading.main_thread():
+                print("⚠️ バックグラウンドスレッドからのイベント送信をスキップ")
+                return
+                
             quit_event = pygame.event.Event(pygame.QUIT)
             pygame.event.post(quit_event)
             print("✅ 正常終了イベント送信完了")
         except Exception as e:
             print(f"⚠️ 終了イベント送信エラー: {e}")
     
+    def _draw_enemy_vision(self, game_state: GameState, start_x: int, start_y: int) -> None:
+        """敵の視野範囲を描画"""
+        for enemy in game_state.enemies:
+            if not enemy.is_alive():
+                continue
+            
+            # 敵の視野範囲セルを取得（壁による遮蔽を考慮）
+            vision_cells = enemy.get_vision_cells(game_state.board)
+            
+            # 視野の色を決定（警戒状態かどうかで変更）
+            vision_color = self.colors['vision_alerted'] if enemy.alerted else self.colors['vision_normal']
+            
+            # 各視野セルを半透明で描画
+            for vision_pos in vision_cells:
+                # 画面範囲内かチェック
+                if 0 <= vision_pos.x < self.width and 0 <= vision_pos.y < self.height:
+                    # 壁や移動禁止セルは視野描画をスキップ
+                    if self._is_vision_blocked(vision_pos, game_state):
+                        continue
+                    
+                    cell_x = start_x + vision_pos.x * self.cell_size
+                    cell_y = start_y + vision_pos.y * self.cell_size
+                    
+                    # 半透明サーフェスを作成
+                    vision_surface = pygame.Surface((self.cell_size, self.cell_size))
+                    vision_surface.set_alpha(80)  # 透明度設定（0-255、低いほど透明）
+                    vision_surface.fill(vision_color)
+                    
+                    # サーフェスを描画
+                    self.screen.blit(vision_surface, (cell_x, cell_y))
+                    
+                    # 警戒状態の場合は枠線を追加
+                    if enemy.alerted:
+                        alert_rect = pygame.Rect(cell_x, cell_y, self.cell_size, self.cell_size)
+                        pygame.draw.rect(self.screen, (200, 0, 0), alert_rect, 3)  # 濃い赤の太い枠線
+    
+    def _is_vision_blocked(self, pos: Position, game_state: GameState) -> bool:
+        """視野が遮られるセルかチェック（壁など）"""
+        # 壁は視野を遮る
+        if pos in game_state.board.walls:
+            return True
+        
+        # 移動禁止セルも視野を遮る
+        if pos in game_state.board.forbidden_cells:
+            return True
+        
+        return False
+
     def cleanup(self) -> None:
         """リソースをクリーンアップ"""
         print("🎮 GUIレンダラー終了")

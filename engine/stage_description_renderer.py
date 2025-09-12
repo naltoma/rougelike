@@ -82,12 +82,20 @@ class StageDescriptionRenderer:
             lines.append(f"   {line}")
         lines.append("")
         
-        # ボード情報
+        # ボード情報 - v1.2.7プレイヤー詳細情報拡張
         lines.append("🎯 ボード情報:")
         board_width, board_height = stage.board_size
         lines.append(f"   サイズ: {board_width} x {board_height}")
         lines.append(f"   スタート位置: ({stage.player_start.x}, {stage.player_start.y})")
+        lines.append(f"   初期向き: {stage.player_direction.value}")
         lines.append(f"   ゴール位置: ({stage.goal_position.x}, {stage.goal_position.y})")
+        
+        # プレイヤー初期ステータス
+        lines.append("")
+        lines.append("🎮 プレイヤー初期ステータス:")
+        lines.append("   HP: 100")
+        lines.append("   攻撃力: 30")
+        lines.append("   向き: " + {"N": "北(↑)", "E": "東(→)", "S": "南(↓)", "W": "西(←)"}.get(stage.player_direction.value, stage.player_direction.value))
         lines.append("")
         
         # 制約情報
@@ -100,17 +108,32 @@ class StageDescriptionRenderer:
         lines.append(f"   使用可能なAPI: {', '.join(allowed_apis)}")
         lines.append("")
         
-        # 敵情報（存在する場合）
+        # 敵情報（存在する場合）- v1.2.7詳細説明拡張
         if hasattr(stage, 'enemies') and stage.enemies:
             lines.append("⚔️ 敵情報:")
             for i, enemy in enumerate(stage.enemies):
                 if isinstance(enemy, dict):
                     pos = enemy.get('position', [0, 0])
                     enemy_type = enemy.get('type', 'normal')
+                    hp = enemy.get('hp', 30)
+                    attack_power = enemy.get('attack_power', 5)
+                    behavior = enemy.get('behavior', 'static')
+                    
                     lines.append(f"   敵{i+1}: {enemy_type} at ({pos[0]}, {pos[1]})")
+                    lines.append(f"     HP: {hp}")
+                    lines.append(f"     攻撃力: {attack_power}")
+                    lines.append(f"     行動: {behavior}")
+                    
+                    # 特別な行動パターンの説明
+                    if behavior == "patrol":
+                        lines.append("     ⮚ 巡回行動：決まったルートを移動します")
+                    elif behavior == "static":
+                        lines.append("     ⮚ 静止行動：その場に留まり、隣接時に攻撃します")
+                    elif behavior == "chase":
+                        lines.append("     ⮚ 追跡行動：プレイヤーを見つけると追いかけます")
             lines.append("")
         
-        # アイテム情報（存在する場合）
+        # アイテム情報（存在する場合）- v1.2.7詳細説明拡張
         if hasattr(stage, 'items') and stage.items:
             lines.append("🎁 アイテム情報:")
             for i, item in enumerate(stage.items):
@@ -118,7 +141,29 @@ class StageDescriptionRenderer:
                     pos = item.get('position', [0, 0])
                     item_name = item.get('name', 'unknown')
                     item_type = item.get('type', 'unknown')
+                    effect = item.get('effect', {})
+                    auto_equip = item.get('auto_equip', False)
+                    
                     lines.append(f"   {item_name} ({item_type}) at ({pos[0]}, {pos[1]})")
+                    
+                    # 効果の詳細説明
+                    if effect:
+                        effect_desc = []
+                        for key, value in effect.items():
+                            if key == 'attack':
+                                effect_desc.append(f"攻撃力+{value}")
+                            elif key == 'defense':
+                                effect_desc.append(f"防御力+{value}")
+                            elif key == 'hp':
+                                effect_desc.append(f"HP+{value}")
+                            else:
+                                effect_desc.append(f"{key}+{value}")
+                        lines.append(f"     効果: {', '.join(effect_desc)}")
+                        
+                    if auto_equip:
+                        lines.append("     自動装備: pickup()で即座に装備されます")
+                    else:
+                        lines.append("     手動装備: pickup()後に手動で装備する必要があります")
             lines.append("")
         
         # クリア条件（ステージ固有）

@@ -29,10 +29,21 @@ class ExecutionController:
         self.single_step_requested = False
         self.pause_requested = False
         
+        # step実行カウンター（連続API呼び出し防止用）
+        self.current_step_actions_allowed = 0
+        
+        # step実行許可トークン（スレッドセーフ）
+        self.step_execution_token = threading.Event()
+        
+        # step実行中フラグ（無限ループ検出無効化用）
+        self.is_step_execution_active = False
+        
         # 初期状態は一時停止
         self.pause_event.clear()
         self.step_event.clear()
         self.stop_requested.clear()
+        self.current_step_actions_allowed = 0
+        self.step_execution_token.clear()
         
         logger.debug("ExecutionController (シンプル版) 初期化完了")
     
@@ -58,20 +69,39 @@ class ExecutionController:
         try:
             with self._lock:
                 if self.state.mode == ExecutionMode.COMPLETED:
-                    return StepResult(
-                        success=False,
-                        action_executed="already_completed",
-                        new_state=ExecutionMode.COMPLETED,
-                        execution_time_ms=0.0,
-                        actions_executed=0
-                    )
+                    # Reset後は新しいsolve()実行を許可
+                    if not hasattr(self, '_solve_thread_started'):
+                        logger.info("🔄 Reset後のStep実行: 新しいsolve()を開始します")
+                        self.state.mode = ExecutionMode.STEPPING  # COMPLETED→STEPPINGに遷移
+                        self.state.is_running = False  # solve()スレッド開始前
+                    else:
+                        return StepResult(
+                            success=False,
+                            action_executed="already_completed",
+                            new_state=ExecutionMode.COMPLETED,
+                            execution_time_ms=0.0,
+                            actions_executed=0
+                        )
+                
+                # 🔧 連続実行中はSTEPPINGに変更しない
+                if self.state.mode != ExecutionMode.CONTINUOUS:
+                    # PAUSED状態からSTEPPINGに遷移する場合、古いフラグを必ずリセット
+                    if self.state.mode == ExecutionMode.PAUSED:
+                        self.single_step_requested = False
+                        logger.debug("🔍 PAUSED→STEPPING遷移: 古いフラグリセット")
+                    self.state.mode = ExecutionMode.STEPPING
                 
                 # ステップフラグをセット - solve()実行を1アクション分許可
                 self.single_step_requested = True
                 
-                # 🔧 連続実行中はSTEPPINGに変更しない
-                if self.state.mode != ExecutionMode.CONTINUOUS:
-                    self.state.mode = ExecutionMode.STEPPING
+                # 新しいstep要求時は1アクション分許可
+                self.current_step_actions_allowed = 1
+                
+                # step実行トークンをセット（1アクションのみ許可）
+                self.step_execution_token.set()
+                
+                # step実行中フラグをセット
+                self.is_step_execution_active = True
                 
                 self.state.step_count += 1
                 
@@ -82,6 +112,12 @@ class ExecutionController:
                 if not self.state.is_running:
                     self.state.is_running = True
                     logger.info("🚀 solve()実行を開始（ステップモード）")
+                
+                # solve()スレッドが開始されていない場合は、強制的にフラグを削除してGUIループで開始させる
+                if hasattr(self, '_solve_thread_started'):
+                    logger.debug("🔍 solve()スレッド既存確認済み")
+                else:
+                    logger.info("🚀 solve()スレッド開始準備完了")
                 
             logger.info(f"✅ ステップ実行要求 #{self.state.step_count}")
             
@@ -112,8 +148,14 @@ class ExecutionController:
         """連続実行開始"""
         with self._lock:
             if self.state.mode == ExecutionMode.COMPLETED:
-                logger.info("✅ solve()の実行が既に完了しています")
-                return
+                # Reset後は新しいsolve()実行を許可
+                if not hasattr(self, '_solve_thread_started'):
+                    logger.info("🔄 Reset後のContinue実行: 新しいsolve()を開始します")
+                    self.state.mode = ExecutionMode.CONTINUOUS  # COMPLETED→CONTINUOUSに遷移
+                    self.state.is_running = False  # solve()スレッド開始前
+                else:
+                    logger.info("✅ solve()の実行が既に完了しています")
+                    return
                 
             self.state.mode = ExecutionMode.CONTINUOUS
             
@@ -127,6 +169,12 @@ class ExecutionController:
             self.state.is_running = True
             self.pause_event.set()
             self.pause_requested = False
+            
+            # solve()スレッドが開始されていない場合の準備
+            if hasattr(self, '_solve_thread_started'):
+                logger.debug("🔍 solve()スレッド既存確認済み（連続実行）")
+            else:
+                logger.info("🚀 solve()スレッド開始準備完了（連続実行）")
             
             # 初回ステップ実行要求を送信
             self.single_step_requested = True
@@ -157,7 +205,7 @@ class ExecutionController:
                 self.state.mode = ExecutionMode.PAUSED
                 self.state.is_running = False
                 self.pause_event.clear()
-                self.stop_requested.set()
+                # 一時停止では停止要求は設定しない（メインループ継続のため）
                 logger.info("⏸️ 実行を即座に一時停止しました")
     
     def stop_execution(self) -> None:
@@ -170,27 +218,108 @@ class ExecutionController:
     
     def wait_for_action(self) -> None:
         """アクション待機処理"""
+        # 停止要求の優先チェック
+        if self.stop_requested.is_set():
+            logger.debug("🔍 停止要求検出 - solve()スレッド終了")
+            import threading
+            current_thread = threading.current_thread()
+            if current_thread is not threading.main_thread():
+                # バックグラウンドスレッドの場合は例外を発生させて終了
+                logger.info(f"🔄 solve()スレッド {current_thread.name} を停止要求により終了")
+                raise RuntimeError("solve() execution stopped by reset")
+            else:
+                logger.info("🔍 停止要求をメインスレッドで検出 - 処理継続")
+            return
+            
         current_mode = self.state.mode
         
         # ログ出力でデバッグ
-        logger.debug(f"wait_for_action呼び出し: mode={current_mode}, step_req={self.single_step_requested}, pause_req={self.pause_requested}")
+        import threading
+        thread_name = threading.current_thread().name
+        logger.info(f"🔍 wait_for_action呼び出し: mode={current_mode}, step_req={self.single_step_requested}, pause_req={self.pause_requested}, thread={thread_name}")
         
         if current_mode == ExecutionMode.STEPPING:
-            self._handle_stepping_mode()
+            # ステップモードではトークンベース制御
+            if self.step_execution_token.is_set():
+                # トークンを即座にクリア（1回限りの使用）
+                with self._lock:
+                    self.step_execution_token.clear()
+                    self.current_step_actions_allowed -= 1
+                    # アクション数が0になったらPAUSEDに遷移（フラグはAPI完了後にクリア）
+                    if self.current_step_actions_allowed <= 0:
+                        self.state.mode = ExecutionMode.PAUSED
+                        self.single_step_requested = False
+                        # is_step_execution_activeはAPI実行完了後にクリアする
+                logger.info(f"🔍 ステップモード: トークン使用→1APIコール許可 (actions_allowed={self.current_step_actions_allowed})")
+                return  # APIコール実行を許可
+            else:
+                # トークンがない場合は待機（solve()スレッドを継続）
+                logger.debug("🔍 ステップモード: トークンなし→待機開始")
+                while not self.step_execution_token.is_set() and self.state.mode == ExecutionMode.STEPPING:
+                    time.sleep(0.001)  # CPU負荷軽減（1ms間隔）
+                    # 停止要求チェック
+                    if self.stop_requested.is_set():
+                        logger.debug("🔍 ステップモード待機中: 停止要求検出")
+                        break
+                    # モード変更チェック
+                    if self.state.mode != ExecutionMode.STEPPING:
+                        break
+                logger.debug("🔍 ステップモード: 待機終了")
+                # 待機後、再帰的にwait_for_action()を呼び出して再チェック
+                self.wait_for_action()
+                return
         elif current_mode == ExecutionMode.CONTINUOUS:
             self._handle_continuous_mode()
+        elif current_mode == ExecutionMode.PAUSED:
+            # PAUSED状態では長時間待機（solve()スレッドを継続）
+            logger.info(f"🔍 PAUSED状態: 実行再開待機中 (thread={thread_name})")
+            while self.state.mode == ExecutionMode.PAUSED and not self.step_execution_token.is_set():
+                time.sleep(0.01)  # 10ms間隔でチェック（応答性向上）
+                # 停止要求チェック
+                if self.stop_requested.is_set():
+                    logger.debug("🔍 PAUSED状態待機中: 停止要求検出")
+                    break
+                # モード変更チェック（Resume等）
+                if self.state.mode != ExecutionMode.PAUSED:
+                    break
+                # step実行トークンがセットされたらループを抜ける
+                if self.step_execution_token.is_set():
+                    break
+            # 待機後、再帰的にwait_for_action()を呼び出して再チェック
+            self.wait_for_action()
+            return
         elif self.stop_requested.is_set():
             self._handle_stop_request()
         else:
-            # その他の状態（PAUSED等）では待機
+            # その他の状態では短時間待機（停止要求チェック付き）
             logger.debug(f"wait_for_action: 状態 {current_mode} で待機中")
-            time.sleep(0.01)
+            start_wait = time.time()
+            while time.time() - start_wait < 0.01:
+                if self.stop_requested.is_set():
+                    logger.debug("🔍 その他状態での停止要求検出")
+                    break
+                time.sleep(0.001)
     
     def _handle_stepping_mode(self) -> None:
-        """ステップモード処理（ハードコーディング方式対応）"""
-        # 🚫 GUIループでのハードコーディング制御のため、wait_for_action()は何もしない
-        logger.debug("🔍 ステップモード: GUIループでハードコーディング実行中")
-        return  # 即座に戻る
+        """ステップモード処理（ネストループ対応版）"""
+        # single_step_requestedフラグがセットされている場合のみ実行を許可
+        if self.single_step_requested:
+            logger.debug("🔍 ステップモード: 1アクション実行を許可")
+            # フラグはAPI実行完了後にクリアする（ここではクリアしない）
+            return  # APIアクションの実行を許可
+        else:
+            # フラグがセットされていない場合は待機
+            # ネストループの場合、内側のループが完了するまでこの状態が続く
+            logger.debug("🔍 ステップモード: 次のステップ要求を待機中")
+            while not self.single_step_requested and self.state.mode == ExecutionMode.STEPPING:
+                time.sleep(0.001)  # CPU負荷軽減（1ms間隔）
+                # 停止要求チェック
+                if self.stop_requested.is_set():
+                    break
+                # プログラム終了チェック
+                if self.state.mode != ExecutionMode.STEPPING:
+                    break
+            return
     
     def _handle_continuous_mode(self) -> None:
         """連続実行モード処理（v1.2.5: 7段階速度対応）"""
@@ -225,11 +354,14 @@ class ExecutionController:
             time.sleep(sleep_time)
         
         # GUI応答性確保のため、定期的にpygameイベントをチェック
-        import pygame
-        try:
-            pygame.event.pump()  # イベントキューを処理
-        except:
-            pass  # pygame初期化前はスキップ
+        # ただし、バックグラウンドスレッドからは呼び出さない（メインスレッドエラー回避）
+        import threading
+        if threading.current_thread() is threading.main_thread():
+            import pygame
+            try:
+                pygame.event.pump()  # イベントキューを処理
+            except:
+                pass  # pygame初期化前はスキップ
     
     def _handle_stop_request(self) -> None:
         """停止要求処理"""
@@ -240,6 +372,71 @@ class ExecutionController:
             
         logger.info("⏹️ 停止要求により一時停止しました")
     
+    def _terminate_solve_threads(self) -> None:
+        """solve()スレッドを完全に停止してリセット"""
+        import threading
+        import time
+        
+        # 現在のスレッド一覧を取得
+        active_threads = threading.enumerate()
+        solve_threads = [t for t in active_threads if t.name.startswith('Thread-') and t != threading.main_thread()]
+        
+        logger.info(f"🔄 アクティブなsolve()スレッド数: {len(solve_threads)}")
+        
+        # まず停止要求を設定（実行中のsolve()に停止シグナルを送信）
+        self.stop_requested.set()
+        
+        # solve()スレッドが停止するまで少し待機
+        max_wait_time = 1.0  # 1秒まで待機
+        start_wait = time.time()
+        
+        while solve_threads and (time.time() - start_wait < max_wait_time):
+            # 生きているsolve()スレッドの確認
+            alive_threads = [t for t in solve_threads if t.is_alive()]
+            if not alive_threads:
+                break
+            
+            logger.info(f"🔄 solve()スレッド停止待機中: {len(alive_threads)}個のスレッドが実行中")
+            time.sleep(0.1)  # 100ms待機
+            
+            # スレッドリストを更新
+            active_threads = threading.enumerate()
+            solve_threads = [t for t in active_threads if t.name.startswith('Thread-') and t != threading.main_thread()]
+        
+        # 最終確認
+        final_threads = [t for t in solve_threads if t.is_alive()]
+        if final_threads:
+            logger.warning(f"⚠️ {len(final_threads)}個のsolve()スレッドが停止しませんでした")
+            for thread in final_threads:
+                logger.warning(f"⚠️ 未停止スレッド: {thread.name}, alive={thread.is_alive()}")
+            
+            # 強制的に継続処理（デーモンスレッドなのでプロセス終了時に自動終了される）
+            logger.warning("⚠️ デーモンスレッドとして継続実行されますが、新しいsolve()実行は可能です")
+        else:
+            logger.info("✅ 全てのsolve()スレッドが停止しました")
+        
+        # solve()スレッド状態フラグは呼び出し元でリセットされる（重複削除を避ける）
+        # if hasattr(self, '_solve_thread_started'):
+        #     delattr(self, '_solve_thread_started')
+        #     logger.info("🔄 _solve_thread_started フラグを削除")
+            
+        # APIの実行状態もリセット
+        from engine.api import _global_api
+        if _global_api and hasattr(_global_api, 'call_history'):
+            _global_api.call_history.clear()
+            logger.info("🔄 API呼び出し履歴をクリア")
+            
+        # action_trackerもリセット（API実行カウンターをリセット）
+        if _global_api and hasattr(_global_api, 'action_tracker') and _global_api.action_tracker:
+            _global_api.action_tracker.reset_counter()
+            logger.info("🔄 ActionTrackerもリセット")
+            
+        # reset完了後に停止要求をクリア（新しいsolve()実行のため）
+        self.stop_requested.clear()
+        logger.info("🔄 スレッド終了処理完了、新しいsolve()実行準備完了")
+        
+        logger.info("🔄 solve()スレッド状態をリセットしました")
+
     def full_system_reset(self):
         """完全システムリセット"""
         logger.info("🔄 完全システムリセットを開始します")
@@ -247,13 +444,40 @@ class ExecutionController:
         
         try:
             with self._lock:
-                # ExecutionController状態リセット
+                # Speed設定を保持
+                current_sleep_interval = self.state.sleep_interval if self.state else 1.0
+                
+                # solve()スレッドの停止要求を先に設定
+                self.stop_requested.set()
+                
+                # ExecutionController状態リセット（Speed設定除く）
                 self.state = ExecutionState()
+                self.state.sleep_interval = current_sleep_interval  # Speed設定を復元
+                self.state.mode = ExecutionMode.PAUSED  # 明示的にPAUSED状態にリセット
+                self.state.is_running = False  # 実行停止状態をクリア
                 self.single_step_requested = False
                 self.pause_requested = False
                 self.pause_event.clear()
                 self.step_event.clear()
-                self.stop_requested.clear()
+                self.current_step_actions_allowed = 0
+                self.step_execution_token.clear()
+                self.is_step_execution_active = False
+                
+                logger.info(f"🔄 ExecutionState リセット完了: mode={self.state.mode}, running={self.state.is_running}")
+                
+                # 少し待ってから停止要求をクリア（solve()スレッドが停止するまで）
+                import time
+                time.sleep(0.1)
+                
+                # solve()スレッド完全停止とリセット
+                self._terminate_solve_threads()
+                
+                # solve()完了状態をリセット（重要：新しいsolve()実行を可能にする）
+                if hasattr(self, '_solve_thread_started'):
+                    delattr(self, '_solve_thread_started')
+                    logger.info("🔄 _solve_thread_started フラグを強制削除（再実行許可）")
+                
+                logger.info(f"🔄 Speed設定を保持: sleep_interval={current_sleep_interval}秒")
             
             # GameManagerリセット
             try:
@@ -261,6 +485,18 @@ class ExecutionController:
                 if _global_api and hasattr(_global_api, 'game_manager') and _global_api.game_manager:
                     _global_api.game_manager.reset_game()
                     logger.info("✅ GameManager.reset_game() 実行完了")
+                    
+                    # Reset後の状態確認
+                    current_state = _global_api.game_manager.get_current_state()
+                    if current_state is None:
+                        logger.warning("⚠️ Reset後: current_state が None")
+                    else:
+                        state_type = type(current_state).__name__
+                        logger.info(f"🔍 Reset後の状態: {state_type}")
+                        if hasattr(current_state, 'player'):
+                            logger.info(f"🔍 Reset後のプレイヤー: HP={current_state.player.hp}")
+                        else:
+                            logger.error(f"🚨 Reset後: current_state に player 属性がありません")
                     
                     # ActionHistoryTrackerリセット
                     if hasattr(_global_api, 'action_tracker') and _global_api.action_tracker:
@@ -311,11 +547,22 @@ class ExecutionController:
         """実行完了確認"""
         return self.state.mode == ExecutionMode.COMPLETED
     
+    def mark_step_api_complete(self) -> None:
+        """単一ステップのAPI実行完了マーク"""
+        with self._lock:
+            logger.info(f"🔍 mark_step_api_complete呼び出し: current_flag={self.is_step_execution_active}")
+            if self.is_step_execution_active:
+                self.is_step_execution_active = False
+                logger.info("🔍 step API実行完了: フラグクリア完了")
+            else:
+                logger.info("🔍 step API実行完了: フラグ既にFalse")
+    
     def mark_solve_complete(self) -> None:
         """solve()完了マーク"""
         with self._lock:
             self.state.mode = ExecutionMode.COMPLETED
             self.state.is_running = False
+            self.is_step_execution_active = False
             
         logger.info("🏁 solve()の実行が完了しました")
     

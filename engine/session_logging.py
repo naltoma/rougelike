@@ -107,6 +107,8 @@ class SessionSummary:
     stages_attempted: List[str] = field(default_factory=list)
     total_actions: int = 0
     total_errors: int = 0
+    # v1.2.7 pickup初回使用記録拡張
+    first_pickup_timestamp: Optional[datetime] = None
     hints_used: int = 0
     successful_stages: int = 0
     total_play_time: timedelta = field(default_factory=lambda: timedelta())
@@ -151,6 +153,7 @@ class SessionSummary:
             "stages_attempted": self.stages_attempted,
             "total_actions": self.total_actions,
             "total_errors": self.total_errors,
+            "first_pickup_timestamp": self.first_pickup_timestamp.isoformat() if self.first_pickup_timestamp else None,
             "hints_used": self.hints_used,
             "successful_stages": self.successful_stages,
             "total_play_time": str(self.total_play_time),
@@ -330,11 +333,22 @@ class SessionLogger:
     
     def log_action(self, action: str, success: bool, message: str, 
                    turn_number: Optional[int] = None, game_state: Optional[GameState] = None) -> None:
-        """アクション実行をログ"""
+        """アクション実行をログ - v1.2.7 pickup初回使用記録拡張"""
         if self.current_session:
             self.current_session.total_actions += 1
             if not success:
                 self.current_session.total_errors += 1
+            
+            # pickup初回使用記録
+            if action == "pickup" and success and self.current_session.first_pickup_timestamp is None:
+                self.current_session.first_pickup_timestamp = datetime.now()
+                # pickup初回使用の特別なログエントリ
+                self.log(
+                    event_type=EventType.USER_INPUT,
+                    level=LogLevel.INFO,
+                    message="pickup()機能を初めて使用しました",
+                    data={"first_usage": True, "learning_milestone": "pickup_introduction"}
+                )
         
         self.log(
             event_type=EventType.ACTION_EXECUTED,
@@ -588,6 +602,7 @@ class SessionLogger:
                     stages_attempted=data.get("stages_attempted", []),
                     total_actions=data.get("total_actions", 0),
                     total_errors=data.get("total_errors", 0),
+                    first_pickup_timestamp=datetime.fromisoformat(data["first_pickup_timestamp"]) if data.get("first_pickup_timestamp") else None,
                     hints_used=data.get("hints_used", 0),
                     successful_stages=data.get("successful_stages", 0)
                 )

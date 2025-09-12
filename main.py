@@ -15,6 +15,7 @@ Python初学者向けローグライク演習フレームワーク
 import argparse
 import logging
 import sys
+import threading
 from pathlib import Path
 # 確認モードでもExecutionModeが必要なため、常にimport
 from engine import ExecutionMode
@@ -200,9 +201,9 @@ def setup_stage(stage_id: str, student_id: str):
             # 現在の速度倍率を同期（デフォルトx2を維持）
             if hasattr(_global_api.renderer, 'current_speed_multiplier') and execution_controller._7stage_speed_manager:
                 # speed_managerがx2でない場合のみ、デフォルトx2に設定
-                if execution_controller._7stage_speed_manager.current_speed_multiplier != 2:
+                if execution_controller._7stage_speed_manager.config.current_multiplier != 2:
                     execution_controller._7stage_speed_manager.apply_speed_change_realtime(2)
-                _global_api.renderer.current_speed_multiplier = execution_controller._7stage_speed_manager.current_speed_multiplier
+                _global_api.renderer.current_speed_multiplier = execution_controller._7stage_speed_manager.config.current_multiplier
                 print(f"   速度倍率同期: x{_global_api.renderer.current_speed_multiplier}")
             
             print(f"🔍 統合後確認:")
@@ -214,7 +215,12 @@ def setup_stage(stage_id: str, student_id: str):
             import traceback
             traceback.print_exc()
         
-    return True
+    # _global_api の準備確認
+    from engine.api import _global_api
+    if not hasattr(_global_api, 'game_manager') or _global_api.game_manager is None:
+        raise RuntimeError("ゲーム初期化に失敗しました")
+    
+    return _global_api.game_manager, execution_controller
 
 def show_initial_state():
     """
@@ -338,6 +344,9 @@ ENABLE_LOGGING = False  # セッションログを有効化
 
 # ================================
 
+# APIをsolve()関数外でimport（関数内で使用可能）
+from engine.api import turn_left, turn_right, move, attack, pickup, see, wait, set_auto_render
+
 def solve():
     """
     学生が編集する関数
@@ -361,7 +370,6 @@ def solve():
     # ここに攻略コードを書いてください
     
     # 例: Stage01の簡単な解法（キャラクタ操作のみ）
-    from engine.api import turn_right, move, set_auto_render
     
     print("🎮 自動解法を実行します...")
     set_auto_render(True)  # 自動レンダリングをオン
@@ -846,85 +854,71 @@ def main():
                 time.sleep(0.01)  # 10ms待機（エラー表示のため少し長め）
             
             elif current_mode == ExecutionMode.STEPPING:
-                # ステップ実行モード：solve()を動的解析して1つずつ実行
-                if execution_controller.single_step_requested:
-                    print("🔍 ステップ実行: solve()の1アクションを実行中...")
-                    try:
-                        # solve()関数の動的解析による実行
-                        step_num = execution_controller.state.step_count
+                # ステップ実行モード：実際のsolve()をネストループ対応で実行
+                try:
+                    # 実際のsolve()関数を呼び出し（APIレイヤーでwait_for_action()制御）
+                    if not hasattr(execution_controller, '_solve_thread_started'):
+                        # 初回のみsolve()をバックグラウンドで開始
+                        def run_solve():
+                            try:
+                                solve()
+                            except RuntimeError as e:
+                                if "stopped by reset" in str(e):
+                                    print(f"🔄 solve()はReset操作により正常終了しました")
+                                else:
+                                    print(f"❌ solve()実行エラー: {e}")
+                            except Exception as e:
+                                print(f"❌ solve()実行エラー: {e}")
+                            finally:
+                                execution_controller.mark_solve_complete()
                         
-                        # 動的solve()解析によるステップ実行
-                        if solve_parser and step_num <= solve_parser.total_steps:
-                            success = _execute_solve_step(step_num)
-                            if not success:
-                                print(f"⚠️ ステップ {step_num} の実行に失敗しました")
-                        else:
-                            print("🎉 solve()完了 - 実装されたアクションをすべて実行しました")
-                            execution_controller.mark_solve_complete()
-                            
-                        # ステップ完了を通知  
-                        print(f"✅ ステップ #{step_num} 完了")
+                        solve_thread = threading.Thread(target=run_solve, daemon=True)
+                        solve_thread.start()
+                        execution_controller._solve_thread_started = True
+                        print("🚀 solve()をバックグラウンドで開始しました")
                         
-                        # single_step_requestedをクリア（次ステップまで待機）
-                        execution_controller.single_step_requested = False
-                            
-                    except Exception as e:
-                        print(f"❌ ステップ実行エラー: {e}")
-                        execution_controller.single_step_requested = False
+                except Exception as e:
+                    print(f"❌ ステップ実行エラー: {e}")
                 
                 # ステップ実行モードではスリープなし（ユーザー待機）
             
             elif current_mode == ExecutionMode.CONTINUOUS:
-                # 連続実行モード：STEPPINGと同じ仕組みだが、wait_for_action()で自動進行
-                if execution_controller.single_step_requested:
-                    print("🔍 連続実行: solve()の1アクションを実行中...")
-                    try:
-                        # 🔧 step_countが0の場合、step_execution()を呼び出してカウントを開始
-                        if execution_controller.state.step_count == 0:
-                            step_result = execution_controller.step_execution()
-                            print(f"🚀 連続実行の最初のステップ実行: {step_result.success}")
+                # 連続実行モード：実際のsolve()をネストループ対応で連続実行
+                try:
+                    if not hasattr(execution_controller, '_solve_thread_started'):
+                        # 実際のsolve()関数をバックグラウンドで実行
+                        def run_solve_continuous():
+                            try:
+                                solve()
+                            except RuntimeError as e:
+                                if "stopped by reset" in str(e):
+                                    print(f"🔄 solve()はReset操作により正常終了しました")
+                                else:
+                                    print(f"❌ solve()実行エラー: {e}")
+                            except Exception as e:
+                                print(f"❌ solve()実行エラー: {e}")
+                            finally:
+                                execution_controller.mark_solve_complete()
                         
-                        # solve()関数の動的解析による実行（連続実行モード）
-                        step_num = execution_controller.state.step_count
+                        solve_thread = threading.Thread(target=run_solve_continuous, daemon=True)
+                        solve_thread.start()
+                        execution_controller._solve_thread_started = True
+                        print("🚀 連続実行のsolve()をバックグラウンドで開始しました")
                         
-                        # 動的solve()解析によるステップ実行
-                        if solve_parser and step_num <= solve_parser.total_steps:
-                            success = _execute_solve_step(step_num)
-                            if not success:
-                                print(f"⚠️ ステップ {step_num} の実行に失敗しました")
-                        else:
-                            print("🎉 solve()完了 - 実装されたアクションをすべて実行しました")
-                            execution_controller.mark_solve_complete()
-                            
-                        # ステップ完了を通知  
-                        print(f"✅ 連続実行 #{execution_controller.state.step_count} 完了")
-                        
-                        # single_step_requestedをクリア（次ステップまで待機）
-                        execution_controller.single_step_requested = False
-                        
-                        # 連続実行のため、次のステップを自動要求（短い間隔後）
-                        if execution_controller.state.mode == ExecutionMode.CONTINUOUS:
-                            time.sleep(execution_controller.state.sleep_interval or 1.0)
-                            
-                            # 🔧 Pauseボタン対応: 一時停止要求をチェック
-                            if execution_controller.pause_requested:
-                                print("⏸️ 一時停止要求を検出 - 次のステップを停止します")
-                                execution_controller.pause_requested = False  # フラグをリセット
-                                # pause_execution()は既にGUIボタンで呼ばれているはずなので、状態確認のみ
-                                if execution_controller.state.mode != ExecutionMode.PAUSED:
-                                    execution_controller.state.mode = ExecutionMode.PAUSED
-                                    execution_controller.state.is_running = False
-                            elif execution_controller.state.mode == ExecutionMode.CONTINUOUS:  # 再確認
-                                execution_controller.step_execution()  # 次のステップを自動実行
-                            
-                    except Exception as e:
-                        print(f"❌ 連続実行エラー: {e}")
-                        execution_controller.single_step_requested = False
-                        execution_controller.state.mode = ExecutionMode.ERROR
+                except Exception as e:
+                    print(f"❌ 連続実行開始エラー: {e}")
+                    execution_controller.state.mode = ExecutionMode.ERROR
                 
-                # 連続実行モードではアクション間隔スリープのみ（line 898で実行）
+                # 連続実行モードでは自動進行（wait_for_action()で速度制御）
             
             else:
+                # PAUSED状態等での待機
+                # solve()スレッドが開始されていない場合でも、モード変更後に開始できるようにチェック
+                if current_mode == ExecutionMode.PAUSED and not hasattr(execution_controller, '_solve_thread_started'):
+                    # PAUSED状態だがsolve()スレッドが開始されていない場合のチェック
+                    # （起動直後のPause→Step/Continue対応）
+                    pass  # 次のループでモード変更時にsolve()スレッドが開始される
+                
                 # 通常のモード変更チェック（デバッグ出力付き）
                 if loop_count % 300 == 0:  # 5秒ごとにデバッグ出力
                     print(f"🔄 待機中... モード: {current_mode.value} (ループ: {loop_count})")
@@ -999,18 +993,7 @@ def main():
         # ログファイルの場所とアクセス方法を表示
         if logging_enabled and session_log_manager.enabled:
             try:
-                print("\n" + "="*60)
-                print("📊 セッションログが生成されました")
-                print("="*60)
-                
-                # ログファイル情報の表示
-                session_log_manager.show_log_info()
-                
-                print("🔍 ログ確認コマンド:")
-                print("  python show_session_logs.py           # 全ログ表示")
-                print("  python show_session_logs.py --latest   # 最新ログのみ")
-                print("  python show_session_logs.py --validate # 整合性チェック")
-                print()
+                print("\n📊 セッションログが生成されました")
                 
             except Exception as e:
                 print(f"⚠️ ログ情報表示エラー: {e}")

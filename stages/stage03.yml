@@ -21,6 +21,8 @@ board:
 player:
   start: [0, 0]
   direction: "S"
+  hp: 100
+  max_hp: 100
 
 goal:
   position: [5, 5]

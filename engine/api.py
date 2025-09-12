@@ -5,6 +5,7 @@ APILayerクラスとグローバル関数の実装
 
 import threading
 import json
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Dict, Any
@@ -24,11 +25,13 @@ from .educational_feedback import (
 from .data_uploader import initialize_data_uploader, get_data_uploader
 from .commands import (
     TurnLeftCommand, TurnRightCommand, MoveCommand, 
-    AttackCommand, PickupCommand, ExecutionResult
+    AttackCommand, PickupCommand, WaitCommand, ExecutionResult
 )
 from .action_history_tracker import ActionHistoryTracker, ActionTrackingError
 from .execution_controller import ExecutionController
 from .session_log_manager import SessionLogManager
+
+logger = logging.getLogger(__name__)
 
 
 class APIUsageError(Exception):
@@ -133,13 +136,22 @@ class APILayer:
                 enemy_type = getattr(EnemyType, enemy_data["type"].upper())
                 # ステージファイルからHPを取得し、max_hpも同じ値に設定
                 enemy_hp = enemy_data.get("hp", 30)
+                # patrol_pathの処理
+                patrol_path = []
+                if "patrol_path" in enemy_data:
+                    for pos_data in enemy_data["patrol_path"]:
+                        patrol_path.append(Position(pos_data[0], pos_data[1]))
+                
                 enemy = Enemy(
                     position=Position(*enemy_data["position"]),
-                    direction=getattr(Direction, enemy_data.get("direction", "NORTH")),
+                    direction=self._parse_direction(enemy_data.get("direction", "N")),
                     hp=enemy_hp,
                     max_hp=enemy_hp,  # HPと同じ値をmax_hpに設定
                     attack_power=enemy_data.get("attack_power", 5),
-                    enemy_type=enemy_type
+                    enemy_type=enemy_type,
+                    behavior_pattern=enemy_data.get("behavior", "static"),
+                    vision_range=enemy_data.get("vision_range", 3),
+                    patrol_path=patrol_path
                 )
                 enemies.append(enemy)
             
@@ -172,7 +184,10 @@ class APILayer:
                 enemies=enemies,
                 items=items,
                 goal_position=stage.goal_position,
-                max_turns=stage.constraints.get("max_turns", 100)
+                max_turns=stage.constraints.get("max_turns", 100),
+                player_hp=stage.player_hp,
+                player_max_hp=stage.player_max_hp,
+                player_attack_power=stage.player_attack_power
             )
             
             # API制限設定
@@ -241,8 +256,38 @@ class APILayer:
             if self.auto_hint_enabled and self.adaptive_hint_system and self.student_id and self.current_stage_id:
                 self._check_auto_hint(current_time)
             
-            # 無限ループ検出
-            if len(self.call_history) >= 10:
+                # 無限ループ検出（最近のAPI実行は無効化）
+            import time
+            
+            # last_action_timeはdatetimeオブジェクトなので、現在時刻との差を計算
+            if hasattr(self, 'last_action_time') and self.last_action_time is not None:
+                time_since_last_action = (datetime.now() - self.last_action_time).total_seconds()
+            else:
+                time_since_last_action = 999
+            is_step_active = getattr(self.execution_controller, 'is_step_execution_active', False)
+            
+            # step実行中、最後のアクションから1秒以内、またはSTEPPINGモードの場合は無限ループ検出を無効化
+            current_mode = getattr(self.execution_controller.state, 'mode', None) if self.execution_controller else None
+            mode_value = current_mode.value if current_mode else 'unknown'
+            
+            # Step実行コンテキストの判定を強化
+            recent_step_execution = (
+                is_step_active or  # step実行中フラグ
+                time_since_last_action <= 2.0 or  # 最近の実行（2秒に拡張）
+                mode_value in ['stepping', 'paused']  # STEPPINGまたはPAUSEDモード（Step後にPAUSEDになるため）
+            )
+            
+            # solve()関数実行中の判定（スレッド名で判定）
+            import threading
+            current_thread = threading.current_thread()
+            is_solve_thread = current_thread.name.startswith('Thread-') and current_thread != threading.main_thread()
+            
+            should_skip_loop_check = (
+                recent_step_execution or  # Step実行関連
+                is_solve_thread  # solve()スレッド実行中
+            )
+            
+            if len(self.call_history) >= 10 and not should_skip_loop_check:
                 self._check_infinite_loop()
         
         self.last_action_time = current_time
@@ -284,7 +329,26 @@ class APILayer:
                 print(f"\n💡 ヒント: {hint.format_message()}")
     
     def _check_infinite_loop(self) -> None:
-        """無限ループをチェック"""
+        """無限ループをチェック（Step・Continue実行モードでは無効化）"""
+        if hasattr(self.execution_controller, 'state'):
+            mode_value = self.execution_controller.state.mode.value
+            is_step_active = getattr(self.execution_controller, 'is_step_execution_active', False)
+            logger.info(f"🔍 無限ループチェック: mode={mode_value}, step_active={is_step_active}")
+            
+            # Step関連モード（STEPPING, PAUSED, CONTINUOUS）または step実行中は無効化
+            if mode_value in ['stepping', 'continuous', 'paused'] or is_step_active:
+                # Step・Continue実行モード、またはStep後のPause状態では無限ループ検出を無効化
+                logger.info(f"🔍 無限ループ検出を無効化（{mode_value}モード、step_active={is_step_active}）")
+                return
+            
+        # 最終確認：step実行中またはCONTINUOUS実行中は無限ループ検出を無効化
+        is_step_active = getattr(self.execution_controller, 'is_step_execution_active', False)
+        mode_value = self.execution_controller.state.mode.value if hasattr(self.execution_controller, 'state') else None
+        
+        if is_step_active or mode_value in ['stepping', 'continuous', 'paused']:
+            logger.info(f"🔍 最終チェック: 無限ループ検出スキップ (step_active={is_step_active}, mode={mode_value})")
+            return
+        
         from .educational_feedback import detect_infinite_loop
         
         loop_info = detect_infinite_loop(self.call_history)
@@ -308,6 +372,20 @@ class APILayer:
             if game_state:
                 self.renderer.render_complete_view(game_state, show_legend=False)
     
+    def _parse_direction(self, direction_str: str) -> Direction:
+        """短縮形の方向文字列をDirection enumに変換"""
+        direction_map = {
+            "N": Direction.NORTH,
+            "E": Direction.EAST,
+            "S": Direction.SOUTH,
+            "W": Direction.WEST,
+            "NORTH": Direction.NORTH,
+            "EAST": Direction.EAST,
+            "SOUTH": Direction.SOUTH,
+            "WEST": Direction.WEST
+        }
+        return direction_map.get(direction_str, Direction.NORTH)
+    
     def _ensure_initialized(self) -> None:
         """初期化確認"""
         if self.game_manager is None:
@@ -316,25 +394,83 @@ class APILayer:
                 "まずapi.initialize_stage('stage01')を呼び出してください。"
             )
     
+    def _get_safe_game_state(self, api_name: str = "unknown") -> Optional:
+        """Thread-safe でタイプ安全な game_state 取得"""
+        if self.game_manager is None:
+            raise APIUsageError("ゲームマネージャーが初期化されていません")
+        
+        game_state = self.game_manager.get_current_state()
+        if game_state is None:
+            return None
+        
+        # 型チェック
+        if not hasattr(game_state, 'player'):
+            import threading
+            logger.error(f"🚨 {api_name}() エラー: game_state has no 'player' attribute")
+            print(f"🚨 {api_name}()でgame_state型エラー:")
+            print(f"   期待: GameState object with .player attribute")
+            print(f"   実際: {type(game_state)} - {game_state}")
+            print(f"   API: {api_name}")
+            print(f"   Thread: {threading.current_thread().name}")
+            print(f"   IsMainThread: {threading.current_thread() is threading.main_thread()}")
+            if self.execution_controller:
+                print(f"   ExecutionMode: {getattr(self.execution_controller.state, 'mode', 'UNKNOWN')}")
+            raise RuntimeError(f"{api_name}(): 無効なgame_state (type: {type(game_state)})")
+        
+        return game_state
+    
+    def _handle_step_completion(self, api_name: str) -> None:
+        """Step実行完了後の制御処理"""
+        if self.execution_controller and hasattr(self.execution_controller, 'mark_step_api_complete'):
+            logger.info(f"🔍 {api_name}(): mark_step_api_completeを呼び出し")
+            self.execution_controller.mark_step_api_complete()
+            
+            # Step実行後の制御は mark_step_api_complete() で完了
+            # 追加の wait_for_action() は不要（二重制御を避ける）
+            logger.info(f"🔍 {api_name}()完了: Step実行制御完了")
+        else:
+            logger.info(f"🔍 {api_name}(): execution_controllerまたはmark_step_api_completeが存在しない")
+    
+    def _check_game_active(self) -> bool:
+        """ゲームが有効な状態かチェック"""
+        if self.game_manager is None:
+            return False
+        
+        current_state = self.game_manager.get_current_state()
+        if current_state is None:
+            return False
+        
+        # ゲーム終了状態では実行不可
+        return not current_state.is_game_over()
+    
     def turn_left(self) -> bool:
         """左に90度回転"""
         try:
             self._ensure_initialized()
             self._check_api_allowed("turn_left")
             
-            # アクション履歴追跡
-            if self.action_tracker:
-                self.action_tracker.track_action("turn_left")
-            
-            # セッションログ記録
-            self._log_action("turn_left")
+            # ゲーム終了後は実行不可
+            if not self._check_game_active():
+                print("❌ ゲームが終了しています。新しいステージを開始してください。")
+                return False
             
             # 実行制御の待機処理
             if self.execution_controller:
                 self.execution_controller.wait_for_action()
             
+            # アクション履歴追跡（実行制御後）
+            if self.action_tracker:
+                self.action_tracker.track_action("turn_left")
+            
+            # セッションログ記録（実行制御後）
+            self._log_action("turn_left")
+            
             command = TurnLeftCommand()
             result = self.game_manager.execute_command(command)
+            
+            # ステップ実行完了処理
+            self._handle_step_completion("turn_left")
+            
             self._record_call("turn_left", result)
             
             if not result.is_success:
@@ -352,19 +488,28 @@ class APILayer:
             self._ensure_initialized()
             self._check_api_allowed("turn_right")
             
-            # アクション履歴追跡
-            if self.action_tracker:
-                self.action_tracker.track_action("turn_right")
-            
-            # セッションログ記録
-            self._log_action("turn_right")
+            # ゲーム終了後は実行不可
+            if not self._check_game_active():
+                print("❌ ゲームが終了しています。新しいステージを開始してください。")
+                return False
             
             # 実行制御の待機処理
             if self.execution_controller:
                 self.execution_controller.wait_for_action()
             
+            # アクション履歴追跡（実行制御後）
+            if self.action_tracker:
+                self.action_tracker.track_action("turn_right")
+            
+            # セッションログ記録（実行制御後）
+            self._log_action("turn_right")
+            
             command = TurnRightCommand()
             result = self.game_manager.execute_command(command)
+            
+            # ステップ実行完了処理
+            self._handle_step_completion("turn_right")
+            
             self._record_call("turn_right", result)
             
             if not result.is_success:
@@ -382,19 +527,28 @@ class APILayer:
             self._ensure_initialized()
             self._check_api_allowed("move")
             
-            # アクション履歴追跡
-            if self.action_tracker:
-                self.action_tracker.track_action("move")
-            
-            # セッションログ記録
-            self._log_action("move")
+            # ゲーム終了後は実行不可
+            if not self._check_game_active():
+                print("❌ ゲームが終了しています。新しいステージを開始してください。")
+                return False
             
             # 実行制御の待機処理
             if self.execution_controller:
                 self.execution_controller.wait_for_action()
             
+            # アクション履歴追跡（実行制御後）
+            if self.action_tracker:
+                self.action_tracker.track_action("move")
+            
+            # セッションログ記録（実行制御後）
+            self._log_action("move")
+            
             command = MoveCommand()
             result = self.game_manager.execute_command(command)
+            
+            # ステップ実行完了処理
+            self._handle_step_completion("move")
+            
             self._record_call("move", result)
             
             if not result.is_success:
@@ -412,16 +566,29 @@ class APILayer:
             self._ensure_initialized()
             self._check_api_allowed("attack")
             
-            # アクション履歴追跡
-            if self.action_tracker:
-                self.action_tracker.track_action("attack")
+            
+            # ゲーム終了後は実行不可
+            if not self._check_game_active():
+                print("❌ ゲームが終了しています。新しいステージを開始してください。")
+                return False
             
             # 実行制御の待機処理
             if self.execution_controller:
                 self.execution_controller.wait_for_action()
             
+            # アクション履歴追跡（実行制御後）
+            if self.action_tracker:
+                self.action_tracker.track_action("attack")
+            
+            # セッションログ記録（実行制御後）
+            self._log_action("attack")
+            
             command = AttackCommand()
             result = self.game_manager.execute_command(command)
+            
+            # ステップ実行完了処理
+            self._handle_step_completion("attack")
+            
             self._record_call("attack", result)
             
             if not result.is_success:
@@ -440,16 +607,28 @@ class APILayer:
             self._ensure_initialized()
             self._check_api_allowed("pickup")
             
-            # アクション履歴追跡
-            if self.action_tracker:
-                self.action_tracker.track_action("pickup")
+            # ゲーム終了後は実行不可
+            if not self._check_game_active():
+                print("❌ ゲームが終了しています。新しいステージを開始してください。")
+                return False
             
             # 実行制御の待機処理
             if self.execution_controller:
                 self.execution_controller.wait_for_action()
             
+            # アクション履歴追跡（実行制御後）
+            if self.action_tracker:
+                self.action_tracker.track_action("pickup")
+            
+            # セッションログ記録（実行制御後）
+            self._log_action("pickup")
+            
             command = PickupCommand()
             result = self.game_manager.execute_command(command)
+            
+            # ステップ実行完了処理
+            self._handle_step_completion("pickup")
+            
             self._record_call("pickup", result)
             
             if not result.is_success:
@@ -460,6 +639,54 @@ class APILayer:
             return True
         except Exception as e:
             self._handle_error(e, {"action": "pickup", "operation": "item_interaction"})
+            return False
+    
+    def wait(self) -> bool:
+        """1ターン待機"""
+        try:
+            logger.info("🔍 wait() メソッド開始")
+            self._ensure_initialized()
+            self._check_api_allowed("wait")
+            
+            # ゲーム終了後は実行不可
+            if not self._check_game_active():
+                print("❌ ゲームが終了しています。新しいステージを開始してください。")
+                return False
+            
+            # 実行制御の待機処理
+            logger.info("🔍 wait(): wait_for_action() 呼び出し前")
+            if self.execution_controller:
+                self.execution_controller.wait_for_action()
+            logger.info("🔍 wait(): wait_for_action() 呼び出し後")
+            
+            # アクション履歴追跡（実行制御後）
+            if self.action_tracker:
+                self.action_tracker.track_action("wait")
+            
+            # セッションログ記録（実行制御後）
+            self._log_action("wait")
+            
+            logger.info("🔍 wait(): WaitCommand実行前")
+            command = WaitCommand()
+            result = self.game_manager.execute_command(command)
+            logger.info("🔍 wait(): WaitCommand実行後")
+            
+            # ステップ実行完了処理
+            logger.info("🔍 wait(): _handle_step_completion() 呼び出し前")
+            self._handle_step_completion("wait")
+            logger.info("🔍 wait(): _handle_step_completion() 呼び出し後")
+            
+            self._record_call("wait", result)
+            
+            if not result.is_success:
+                print(f"❌ 待機失敗: {result.message}")
+                return False
+            
+            print(f"⏰ {result.message}")
+            logger.info("🔍 wait() メソッド完了")
+            return True
+        except Exception as e:
+            self._handle_error(e, {"action": "wait", "operation": "turn_management"})
             return False
     
     def see(self) -> Dict[str, Any]:
@@ -480,6 +707,24 @@ class APILayer:
             if game_state is None:
                 return {}
             
+            # デバッグ用: game_stateのタイプチェック
+            if not hasattr(game_state, 'player'):
+                import threading
+                logger.error(f"🚨 see() エラー: game_state has no 'player' attribute. Type: {type(game_state)}, Value: {game_state}")
+                print(f"🚨 see()エラー詳細:")
+                print(f"   game_state type: {type(game_state)}")
+                print(f"   game_state value: {game_state}")
+                print(f"   hasattr player: {hasattr(game_state, 'player')}")
+                print(f"   current thread: {threading.current_thread().name}")
+                print(f"   is main thread: {threading.current_thread() is threading.main_thread()}")
+                print(f"   execution_controller: {self.execution_controller}")
+                if self.execution_controller:
+                    print(f"   execution mode: {getattr(self.execution_controller.state, 'mode', 'UNKNOWN')}")
+                    print(f"   step execution active: {getattr(self.execution_controller, 'is_step_execution_active', 'UNKNOWN')}")
+                if hasattr(game_state, '__dict__'):
+                    print(f"   game_state.__dict__: {game_state.__dict__}")
+                return {"error": "game_state is invalid", "type": str(type(game_state))}
+            
             player = game_state.player
             current_pos = player.position
             
@@ -498,7 +743,10 @@ class APILayer:
                     "hp": player.hp,
                     "attack_power": player.attack_power
                 },
-                "surroundings": {}
+                "surroundings": {},
+                # v1.2.7 拡張: アイテム・敵情報返却
+                "items": [],
+                "enemies": []
             }
             
             # 各方向の状況をチェック
@@ -559,6 +807,54 @@ class APILayer:
             else:
                 result["at_foot"] = None
             
+            # v1.2.7 拡張: 全アイテム情報を配列として返却
+            for item in game_state.items:
+                result["items"].append({
+                    "name": item.name,
+                    "type": item.item_type.value,
+                    "position": [item.position.x, item.position.y],
+                    "effect": item.effect,
+                    "auto_equip": item.auto_equip
+                })
+            
+            # v1.2.7 拡張: 全敵情報を配列として返却（HP・攻撃力・移動モード含む）
+            for enemy in game_state.enemies:
+                enemy_info = {
+                    "type": enemy.enemy_type.value,
+                    "position": [enemy.position.x, enemy.position.y],
+                    "hp": enemy.hp,
+                    "max_hp": enemy.max_hp,
+                    "attack_power": enemy.attack_power,
+                    "direction": enemy.direction.value,
+                    "is_alive": enemy.is_alive(),
+                    "alerted": enemy.alerted  # 警戒状態を追加
+                }
+                
+                # AdvancedEnemyの場合は追加情報
+                if hasattr(enemy, 'movement_mode'):
+                    enemy_info["movement_mode"] = enemy.movement_mode
+                if hasattr(enemy, 'vision_range'):
+                    enemy_info["vision_range"] = enemy.vision_range
+                if hasattr(enemy, 'current_state'):
+                    enemy_info["state"] = enemy.current_state.value
+                
+                result["enemies"].append(enemy_info)
+            
+            # 敵の視野可視化情報
+            result["enemy_visions"] = []
+            for i, enemy in enumerate(game_state.enemies):
+                if enemy.is_alive():
+                    vision_cells = enemy.get_vision_cells(game_state.board)
+                    result["enemy_visions"].append({
+                        "enemy_index": i,
+                        "enemy_position": [enemy.position.x, enemy.position.y],
+                        "enemy_direction": enemy.direction.value,
+                        "vision_range": enemy.vision_range,
+                        "alerted": enemy.alerted,
+                        "can_see_player": enemy.can_see_player(player.position),
+                        "vision_cells": [[pos.x, pos.y] for pos in vision_cells]
+                    })
+            
             # ゲーム状況
             result["game_status"] = {
                 "turn": game_state.turn_count,
@@ -574,10 +870,71 @@ class APILayer:
                 message="周囲確認完了"
             ))
             
+            # 敵の視野範囲をマップ表示（デバッグ用）
+            if any(enemy.alerted or enemy.can_see_player(player.position) for enemy in game_state.enemies):
+                print("\n👁️ 敵の視野情報:")
+                self._display_vision_map(game_state)
+            
             return result
         except Exception as e:
             self._handle_error(e, {"action": "see", "operation": "environment_observation"})
             return {}
+    
+    
+    def _display_vision_map(self, game_state) -> None:
+        """敵の視野範囲をマップ表示"""
+        if not hasattr(game_state, 'player'):
+            logger.error(f"🚨 _display_vision_map エラー: game_state has no 'player' attribute")
+            return
+        board = game_state.board
+        player_pos = game_state.player.position
+        
+        # マップグリッドを作成
+        grid = []
+        for y in range(board.height):
+            row = []
+            for x in range(board.width):
+                pos = Position(x, y)
+                if pos == player_pos:
+                    row.append('P')
+                elif board.is_wall(pos):
+                    row.append('#')
+                elif pos == game_state.goal_position:
+                    row.append('G')
+                else:
+                    row.append('.')
+            grid.append(row)
+        
+        # 敵の位置と視野範囲を追加
+        for i, enemy in enumerate(game_state.enemies):
+            if not enemy.is_alive():
+                continue
+                
+            # 敵の位置
+            ex, ey = enemy.position.x, enemy.position.y
+            grid[ey][ex] = f'E{i+1}'
+            
+            # 視野範囲をマーク
+            vision_cells = enemy.get_vision_cells(board)
+            for pos in vision_cells:
+                if 0 <= pos.x < board.width and 0 <= pos.y < board.height:
+                    if grid[pos.y][pos.x] == '.':
+                        grid[pos.y][pos.x] = '·'  # 視野範囲マーク
+        
+        # マップを表示
+        print("  " + "".join([str(x % 10) for x in range(board.width)]))
+        for y, row in enumerate(grid):
+            print(f"{y} " + "".join(row))
+        
+        # 凡例
+        print("凡例: P=プレイヤー, E1-En=敵, G=ゴール, #=壁, ·=敵視野範囲, .=空きマス")
+        
+        # 敵の状態詳細
+        for i, enemy in enumerate(game_state.enemies):
+            if enemy.is_alive():
+                status = "👀警戒中" if enemy.alerted else "😴非警戒"
+                can_see = "👁️視認中" if enemy.can_see_player(player_pos) else "👁️‍🗨️視認外"
+                print(f"  敵{i+1}({enemy.position.x},{enemy.position.y}) {enemy.direction.value}向き: {status} {can_see}")
     
     def can_undo(self) -> bool:
         """取り消し可能かチェック"""
@@ -782,7 +1139,7 @@ class APILayer:
         # ゲーム状態情報を追加
         if self.game_manager:
             game_state = self.game_manager.get_current_state()
-            if game_state:
+            if game_state and hasattr(game_state, 'player'):
                 error_context.update({
                     "game_state": {
                         "player_position": {"x": game_state.player.position.x, "y": game_state.player.position.y},
@@ -1254,6 +1611,15 @@ def pickup() -> bool:
     return _global_api.pickup()
 
 
+def wait() -> bool:
+    """1ターン待機
+    
+    Returns:
+        bool: 待機成功時True
+    """
+    return _global_api.wait()
+
+
 def see() -> Dict[str, Any]:
     """周囲の状況を確認
     
@@ -1261,6 +1627,7 @@ def see() -> Dict[str, Any]:
         Dict: 周囲の状況情報
     """
     return _global_api.see()
+
 
 
 def can_undo() -> bool:
@@ -1833,7 +2200,7 @@ def show_class_report(class_students: List[str]) -> None:
 __all__ = [
     "APILayer", "APIUsageError", "initialize_api",
     "initialize_stage", "turn_left", "turn_right", "move",
-    "attack", "pickup", "see", "can_undo", "undo",
+    "attack", "pickup", "wait", "see", "can_undo", "undo",
     "is_game_finished", "get_game_result", "get_call_history", "reset_stage",
     "show_current_state", "set_auto_render", "show_legend", "show_action_history",
     "enable_action_tracking", "disable_action_tracking", "reset_action_history",
