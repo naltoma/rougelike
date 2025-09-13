@@ -6,7 +6,7 @@
 - **配布方式**: conda環境配布、手動セットアップによる学習効果
 
 ## Frontend
-- **GUI v1.2.6**: pygame（デフォルト表示・実行制御対応・Critical Fixes完了・セッションログ統合完了・Webhook連携対応・Attack System統合完了）
+- **GUI v1.2.7**: pygame（デフォルト表示・実行制御対応・Critical Fixes完了・セッションログ統合完了・Webhook連携対応・Attack System統合完了・Wait API & Enemy AI Vision System統合完了）
   - 2D描画、5x5〜10x10グリッド表示
   - キャラクター・敵・アイテム・壁の視覚化
   - 大型敵（2x2, 3x3）・特殊敵（2x3）対応
@@ -23,8 +23,8 @@
   turn_left(), turn_right()  # 向き変更
   move()                     # 正面移動
   attack()                   # 攻撃 (v1.2.6完全統合)
-  pickup()                   # アイテム取得 (v1.2.7予定)
-  wait()                     # 待機 (v1.2.7予定)
+  pickup()                   # アイテム取得 (v1.2.8予定)
+  wait()                     # 戦術的待機 (v1.2.7完全統合)
   see() -> dict             # 状況取得
   ```
 
@@ -109,6 +109,23 @@
   - フレームワーク必須行除外（def, from, set_auto_render, print()）
   - 実際の学習コード行のみ記録
 
+## 🛡️ v1.2.7 Wait API & Enemy AI Vision System Components (COMPLETED)
+- **wait()API統合**: 戦術的待機システム実装
+  - 1ターン待機による敵行動観察機能
+  - プレイヤーアクションとして完全統合
+  - 戦略的タイミング判断学習支援
+- **敵AI視覚システム**: 高度な敵行動AI実装
+  - 方向性視覚システム（前方視界・視線方向制御）
+  - 壁遮蔽システム（視線ブロック・見通し判定）
+  - 警戒追跡システム（プレイヤー発見・追跡・記憶）
+  - 巡回パターンAI（巡視ルート・方向転換）
+- **Stage07-10追加**: wait()・敵AI視覚活用ステージ
+  - 段階的戦術学習（敵行動観察→視界回避→巡回パターン→高度戦術）
+  - 敵AI行動パターン学習とタイミング戦略
+- **ステージ毎プレイヤー設定**: 柔軟なゲームバランス調整
+  - プレイヤーHP・攻撃力のステージ毎設定
+  - YAML定義による動的パラメータ制御
+
 ## 🔗 v1.2.3 Google Apps Script Webhook Integration Components (COMPLETED)
 - **WebhookUploader**: Google Apps Script Webhook送信機能
   - HTTP POST通信による無料Webhook連携
@@ -174,11 +191,11 @@ conda activate rougelike
 pip install -r requirements.txt
 
 # 実行
-python main.py          # GUI v1.2.6 mode（デフォルト・7段階速度制御・初回確認モード・Webhook対応・Attack System統合）
+python main.py          # GUI v1.2.7 mode（デフォルト・7段階速度制御・初回確認モード・Webhook対応・Attack System統合・Wait API & Enemy AI Vision System統合）
 python main.py --cui    # CUI mode
 python main.py --gui    # 明示的GUI指定
 python student_example.py  # 学生サンプル実行
-# v1.2.6: Attack System統合・Enemy Info Panel・敵インデックス表示
+# v1.2.7: Wait API & Enemy AI Vision System統合・Stage07-10追加・ステージ毎プレイヤー設定
 # ENABLE_LOGGING = False (確認モード) / True (実行モード)
 
 # セッションログ確認（v1.2.2）

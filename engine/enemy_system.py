@@ -9,7 +9,7 @@ import math
 from enum import Enum
 from typing import List, Dict, Optional, Tuple, Any
 from dataclasses import dataclass
-from . import Enemy, EnemyType, Position, Direction
+from . import Enemy, EnemyType, Position, Direction, EnemyMode, RageState
 
 
 class BehaviorPattern(Enum):
@@ -693,3 +693,353 @@ class EnemyFactory:
         )
         
         return AdvancedEnemy(position, Direction.NORTH, enemy_type, ai_config, stats)
+
+
+# v1.2.8 特殊条件付きステージ - 大型敵システム実装
+class LargeEnemySystem:
+    """大型敵システム - v1.2.8特殊条件付きステージ"""
+    
+    def __init__(self):
+        """初期化"""
+        self.large_enemies: Dict[str, Enemy] = {}  # 敵ID -> 敵オブジェクト
+        self.rage_controllers: Dict[str, 'RageModeController'] = {}
+    
+    def initialize_large_enemy(self, enemy: Enemy, enemy_id: str) -> None:
+        """大型敵初期配置・状態設定"""
+        if enemy.enemy_type not in [EnemyType.LARGE_2X2, EnemyType.LARGE_3X3]:
+            raise ValueError(f"大型敵タイプではありません: {enemy.enemy_type}")
+        
+        # 大型敵登録
+        self.large_enemies[enemy_id] = enemy
+        
+        # 怒りモード状態確認・初期化
+        if enemy.rage_state is None:
+            enemy.rage_state = RageState()
+        
+        enemy.enemy_mode = EnemyMode.CALM
+        
+        # 怒りモード制御器作成
+        self.rage_controllers[enemy_id] = RageModeController(enemy, self)
+    
+    def update_rage_state(self, enemy_id: str, current_hp: int) -> None:
+        """HP監視・怒りモード判定ロジック"""
+        if enemy_id not in self.large_enemies:
+            return
+        
+        enemy = self.large_enemies[enemy_id]
+        
+        # HP50%以下で怒りモード発動
+        hp_ratio = current_hp / enemy.max_hp
+        if hp_ratio <= enemy.rage_state.trigger_hp_threshold and not enemy.rage_state.is_active:
+            self.trigger_rage_mode(enemy_id)
+        
+        # 注意: ターン管理は別の場所で呼び出される (update_rage_turn_for_enemy)
+    
+    def update_rage_turn_for_enemy(self, enemy_id: str) -> None:
+        """指定敵の怒りモードターン管理"""
+        if enemy_id not in self.rage_controllers:
+            return
+        controller = self.rage_controllers[enemy_id]
+        controller.update_rage_turn()
+    
+    def trigger_rage_mode(self, enemy_id: str) -> None:
+        """HP50%以下での怒りモード発動"""
+        if enemy_id not in self.large_enemies:
+            return
+        
+        enemy = self.large_enemies[enemy_id]
+        
+        # 怒りモード状態遷移
+        enemy.enemy_mode = EnemyMode.TRANSITIONING
+        enemy.rage_state.is_active = True
+        enemy.rage_state.turns_in_rage = 0
+        enemy.rage_state.area_attack_executed = False
+        enemy.rage_state.transition_turn_count = 1  # 1ターン遷移期間
+    
+    def reset_to_calm_mode(self, enemy_id: str) -> None:
+        """範囲攻撃後の平常モード復帰"""
+        if enemy_id not in self.large_enemies:
+            return
+        
+        enemy = self.large_enemies[enemy_id]
+        
+        # 平常モード復帰
+        enemy.enemy_mode = EnemyMode.CALM
+        enemy.rage_state.is_active = False
+        enemy.rage_state.turns_in_rage = 0
+        enemy.rage_state.area_attack_executed = False
+        enemy.rage_state.transition_turn_count = 0
+    
+    def get_enemy_mode(self, enemy_id: str) -> Optional[str]:
+        """敵のモード取得"""
+        if enemy_id not in self.large_enemies:
+            return None
+        return self.large_enemies[enemy_id].enemy_mode.value
+    
+    def execute_area_attack(self, enemy_id: str, player_position: Position) -> Tuple[bool, int]:
+        """大型敵周囲1マス全体攻撃実行"""
+        if enemy_id not in self.large_enemies:
+            return False, 0
+        
+        enemy = self.large_enemies[enemy_id]
+        if enemy.enemy_mode != EnemyMode.RAGE:
+            return False, 0
+        
+        # 攻撃範囲座標取得
+        attack_range = self.get_area_attack_range(enemy_id)
+        
+        # プレイヤーが範囲内にいるかチェック
+        if player_position in attack_range:
+            damage = enemy.attack_power
+            enemy.rage_state.area_attack_executed = True
+            return True, damage
+        
+        # プレイヤーが範囲外でも攻撃は実行される
+        enemy.rage_state.area_attack_executed = True
+        return False, 0
+    
+    def get_area_attack_range(self, enemy_id: str) -> List[Position]:
+        """攻撃対象座標計算"""
+        if enemy_id not in self.large_enemies:
+            return []
+        
+        enemy = self.large_enemies[enemy_id]
+        attack_positions = []
+        
+        # 敵が占有するマスを取得
+        occupied_positions = enemy.get_occupied_positions()
+        
+        # 各占有マスの周囲1マスを攻撃範囲に追加
+        for pos in occupied_positions:
+            for dx in [-1, 0, 1]:
+                for dy in [-1, 0, 1]:
+                    # 自分自身の位置は除外
+                    if dx == 0 and dy == 0:
+                        continue
+                    
+                    attack_pos = Position(pos.x + dx, pos.y + dy)
+                    if attack_pos not in attack_positions:
+                        attack_positions.append(attack_pos)
+        
+        # 重複除去（敵が占有する位置は攻撃範囲から除外）
+        final_positions = []
+        for pos in attack_positions:
+            if pos not in occupied_positions and pos not in final_positions:
+                final_positions.append(pos)
+        
+        return final_positions
+
+
+class RageModeController:
+    """怒りモード制御器 - LargeEnemySystem内部クラス"""
+    
+    def __init__(self, enemy: Enemy, large_enemy_system: LargeEnemySystem):
+        self.enemy = enemy
+        self.system = large_enemy_system
+    
+    def update_rage_turn(self) -> None:
+        """怒りモード1ターン遷移ロジック"""
+        # 状態遷移中の処理
+        if self.enemy.enemy_mode == EnemyMode.TRANSITIONING:
+            self.enemy.rage_state.transition_turn_count -= 1
+            if self.enemy.rage_state.transition_turn_count <= 0:
+                self.enemy.enemy_mode = EnemyMode.RAGE
+                # 怒りモードに入った時にもターン数をカウント
+                self.enemy.rage_state.turns_in_rage += 1
+        
+        # 怒りモード中の処理
+        elif self.enemy.enemy_mode == EnemyMode.RAGE:
+            # 怒りモード最初のターンで範囲攻撃実行
+            if self.enemy.rage_state.turns_in_rage == 1 and not self.enemy.rage_state.area_attack_executed:
+                # 範囲攻撃実行権限付与
+                self._prepare_area_attack()
+                self.enemy.rage_state.turns_in_rage += 1
+            elif self.enemy.rage_state.area_attack_executed:
+                # 範囲攻撃後は平常モードに復帰
+                enemy_id = self._get_enemy_id()
+                if enemy_id:
+                    self.system.reset_to_calm_mode(enemy_id)
+            else:
+                # その他の場合は通常のターン進行
+                self.enemy.rage_state.turns_in_rage += 1
+    
+    def _prepare_area_attack(self) -> None:
+        """範囲攻撃準備"""
+        # 範囲攻撃準備完了マークを設定
+        # 実際の範囲攻撃実行は外部システム（ゲームループ）で execute_area_attack を呼び出す
+        self.enemy.rage_state.area_attack_executed = True
+    
+    def _get_enemy_id(self) -> Optional[str]:
+        """敵IDを逆引き"""
+        for enemy_id, enemy in self.system.large_enemies.items():
+            if enemy is self.enemy:
+                return enemy_id
+        return None
+
+
+# v1.2.8 特殊条件付きステージ - 特殊敵システム実装
+class SpecialEnemySystem:
+    """特殊敵システム - v1.2.8特殊条件付きステージ"""
+    
+    def __init__(self):
+        """初期化"""
+        self.special_enemies: Dict[str, Enemy] = {}  # 敵ID -> 敵オブジェクト
+    
+    def initialize_special_enemy(self, enemy: Enemy, enemy_id: str) -> None:
+        """HP/ATK=10000設定・特殊敵初期化"""
+        if enemy.enemy_type != EnemyType.SPECIAL_2X3:
+            raise ValueError(f"特殊敵タイプではありません: {enemy.enemy_type}")
+        
+        # 特殊敵のHP・攻撃力を10000に設定
+        enemy.hp = 10000
+        enemy.max_hp = 10000
+        enemy.attack_power = 10000
+        
+        # 特殊敵登録
+        self.special_enemies[enemy_id] = enemy
+        
+        # 条件付き行動状態確認・初期化
+        if enemy.conditional_behavior is None:
+            from . import ConditionalBehavior
+            enemy.conditional_behavior = ConditionalBehavior()
+        
+        # 初期状態は平常モード（反撃のみ）
+        enemy.enemy_mode = EnemyMode.CALM
+    
+    def activate_hunting_mode(self, enemy_id: str, target_position: Position) -> None:
+        """条件違反時プレイヤー追跡モード発動"""
+        if enemy_id not in self.special_enemies:
+            return
+        
+        enemy = self.special_enemies[enemy_id]
+        
+        # 追跡モードに遷移
+        enemy.enemy_mode = EnemyMode.HUNTING
+        enemy.conditional_behavior.violation_detected = True
+        enemy.conditional_behavior.hunting_target = target_position
+    
+    def auto_eliminate(self, enemy_id: str) -> bool:
+        """条件達成時特殊敵消去"""
+        if enemy_id not in self.special_enemies:
+            return False
+        
+        enemy = self.special_enemies[enemy_id]
+        
+        # 条件達成チェック（攻撃順序が正しい場合）
+        if self._check_elimination_conditions(enemy):
+            # 特殊敵を無力化（HP=0にする）
+            enemy.hp = 0
+            return True
+        
+        return False
+    
+    def is_behavior_restricted(self, enemy_id: str) -> bool:
+        """平常時行動制限チェック（移動・巡視・追跡無効化）"""
+        if enemy_id not in self.special_enemies:
+            return False
+        
+        enemy = self.special_enemies[enemy_id]
+        
+        # 平常モードでは行動制限
+        return enemy.enemy_mode == EnemyMode.CALM
+    
+    def get_special_enemy_mode(self, enemy_id: str) -> Optional[str]:
+        """特殊敵のモード取得"""
+        if enemy_id not in self.special_enemies:
+            return None
+        return self.special_enemies[enemy_id].enemy_mode.value
+    
+    def update_conditional_behavior(self, enemy_id: str, attack_sequence: List[str]) -> None:
+        """攻撃順序更新"""
+        if enemy_id not in self.special_enemies:
+            return
+        
+        enemy = self.special_enemies[enemy_id]
+        enemy.conditional_behavior.current_sequence = attack_sequence.copy()
+    
+    def _check_elimination_conditions(self, enemy: Enemy) -> bool:
+        """特殊敵消去条件チェック"""
+        # 必須攻撃順序が設定されていない場合は消去不可
+        if not enemy.conditional_behavior.required_sequence:
+            return False
+        
+        # 現在の攻撃順序が必須順序と一致するかチェック
+        current = enemy.conditional_behavior.current_sequence
+        required = enemy.conditional_behavior.required_sequence
+        
+        # 順序が一致し、すべて完了している場合
+        return len(current) >= len(required) and current[:len(required)] == required
+
+
+class ConditionalBattleManager:
+    """条件付き戦闘管理システム - v1.2.8特殊条件付きステージ"""
+    
+    def __init__(self):
+        """初期化"""
+        self.attack_sequence: List[str] = []  # 攻撃順序記録
+        self.required_sequence: List[str] = ["large_2x2", "large_3x3"]  # デフォルト必須順序
+        self.violation_feedback: List[str] = []  # 教育的フィードバック
+    
+    def register_attack_sequence(self, enemy_type: str) -> None:
+        """攻撃順序記録"""
+        # 敵タイプを文字列として記録
+        type_mapping = {
+            "large_2x2": "2x2大型敵",
+            "large_3x3": "3x3大型敵", 
+            "special_2x3": "2x3特殊敵"
+        }
+        
+        attack_target = type_mapping.get(enemy_type, enemy_type)
+        self.attack_sequence.append(attack_target)
+    
+    def validate_attack_sequence(self) -> bool:
+        """攻撃順序検証（大型敵2x2→3x3順序）"""
+        if len(self.attack_sequence) < len(self.required_sequence):
+            return True  # まだ判定段階ではない
+        
+        # 必須順序との比較
+        for i, required_target in enumerate(self.required_sequence):
+            # タイプマッピング（カスタム順序にも対応）
+            type_mapping = {
+                "large_2x2": "2x2大型敵",
+                "large_3x3": "3x3大型敵", 
+                "special_2x3": "2x3特殊敵"
+            }
+            expected = type_mapping.get(required_target, required_target)
+            
+            if i >= len(self.attack_sequence) or self.attack_sequence[i] != expected:
+                return False
+        
+        return True
+    
+    def check_conditional_violation(self) -> bool:
+        """特殊条件違反判定"""
+        is_valid = self.validate_attack_sequence()
+        
+        if not is_valid:
+            # 違反内容を記録
+            self.violation_feedback.append(
+                f"攻撃順序違反: 期待順序 {self.required_sequence}, 実際 {self.attack_sequence}"
+            )
+        
+        return not is_valid
+    
+    def get_violation_feedback(self) -> List[str]:
+        """教育的フィードバック生成"""
+        if not self.violation_feedback:
+            return ["正しい攻撃順序で進行しています。"]
+        
+        feedback = []
+        feedback.extend(self.violation_feedback)
+        feedback.append("ヒント: 大型敵は2x2 → 3x3の順序で攻撃してください。")
+        
+        return feedback
+    
+    def reset_sequence(self) -> None:
+        """攻撃順序リセット"""
+        self.attack_sequence.clear()
+        self.violation_feedback.clear()
+    
+    def set_required_sequence(self, sequence: List[str]) -> None:
+        """必須攻撃順序設定"""
+        self.required_sequence = sequence.copy()

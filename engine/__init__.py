@@ -83,10 +83,40 @@ class ExecutionMode(Enum):
     RESET = "reset"          # 🆕 v1.2.1: リセット処理中
     ERROR = "error"          # 🆕 v1.2.1: エラー状態
 
+class EnemyMode(Enum):
+    """敵の動作モード - v1.2.8特殊条件付きステージ"""
+    CALM = "calm"             # 平常モード
+    RAGE = "rage"             # 怒りモード
+    HUNTING = "hunting"       # 追跡モード（特殊敵専用）
+    TRANSITIONING = "transitioning"  # 状態遷移中
+
 class TurnPhase(Enum):
     """ターンフェーズ - v1.2.6攻撃システム統合"""
     PLAYER = "player"         # プレイヤーターン
     ENEMY = "enemy"           # 敵ターン
+
+@dataclass
+class RageState:
+    """怒りモード状態 - v1.2.8特殊条件付きステージ"""
+    is_active: bool = False
+    trigger_hp_threshold: float = 0.5  # HP50%で発動
+    turns_in_rage: int = 0
+    area_attack_executed: bool = False
+    transition_turn_count: int = 0
+
+@dataclass
+class ConditionalBehavior:
+    """特殊敵の条件付き行動 - v1.2.8特殊条件付きステージ"""
+    violation_detected: bool = False
+    required_sequence: List[str] = None
+    current_sequence: List[str] = None
+    hunting_target: Optional['Position'] = None
+    
+    def __post_init__(self):
+        if self.required_sequence is None:
+            self.required_sequence = []
+        if self.current_sequence is None:
+            self.current_sequence = []
 
 @dataclass(frozen=True)
 class Position:
@@ -159,11 +189,25 @@ class Enemy(Character):
     current_patrol_index: int = 0  # 現在の巡回インデックス
     alert_cooldown: int = 0  # 警戒状態のクールダウン（ターン数）
     last_seen_player: Position = None  # 最後にプレイヤーを見た位置
+    # v1.2.8特殊条件付きステージ - 新状態・モード管理
+    enemy_mode: EnemyMode = EnemyMode.CALM
+    rage_state: Optional['RageState'] = None
+    conditional_behavior: Optional['ConditionalBehavior'] = None
     
     def __post_init__(self):
         super().__post_init__()
         if self.patrol_path is None:
             self.patrol_path = []
+        
+        # v1.2.8: 大型敵にRageState自動初期化
+        if self.enemy_type in [EnemyType.LARGE_2X2, EnemyType.LARGE_3X3]:
+            if self.rage_state is None:
+                self.rage_state = RageState()
+        
+        # v1.2.8: 特殊敵にConditionalBehavior自動初期化
+        if self.enemy_type == EnemyType.SPECIAL_2X3:
+            if self.conditional_behavior is None:
+                self.conditional_behavior = ConditionalBehavior()
     
     def get_size(self):
         """敵のサイズを取得 (width, height)"""
@@ -336,6 +380,7 @@ class GameState:
     max_turns: int = 100
     status: GameStatus = GameStatus.PLAYING
     goal_position: Optional[Position] = None
+    stage_id: Optional[str] = None  # ステージ識別用
     
     def __post_init__(self):
         """バリデーション"""

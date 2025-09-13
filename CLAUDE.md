@@ -27,6 +27,7 @@ Kiro-style Spec Driven Development implementation using claude code slash comman
 - `continue-execution-speed-control-v1.2.5`: Continue実行速度調整機能 - 7段階速度制御・超高速実行対応（v1.2.5で完了） - 詳細は [docs/v1.2.5.md](docs/v1.2.5.md) 参照
 - `attack-system-integration-v1.2.6`: attack機能導入・敵AIカウンター攻撃システム - stage04-06実装・攻撃ベース学習ステージ（v1.2.6で完了） - 詳細は [docs/v1.2.6.md](docs/v1.2.6.md) 参照
 - `pickup-wait-system-v1.2.7`: wait()API導入・敵AI視覚システム・ステージ毎プレイヤー設定・stage07-10実装（v1.2.7で完了） - 詳細は [docs/v1.2.7.md](docs/v1.2.7.md) 参照
+- `special-conditional-stages-v1.2.8`: 特殊条件付きステージ（Stage11-13）・大型敵システム・特殊敵システム実装（v1.2.8で完了） - 詳細は [docs/v1.2.8.md](docs/v1.2.8.md) 参照
 
 ## Development Guidelines
 - Think in English, but generate responses in Japanese (思考は英語、回答の生成は日本語で行うように)

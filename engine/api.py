@@ -153,6 +153,13 @@ class APILayer:
                     vision_range=enemy_data.get("vision_range", 3),
                     patrol_path=patrol_path
                 )
+                
+                # v1.2.8: 拡張属性を設定
+                if "stage11_special" in enemy_data:
+                    enemy.stage11_special = enemy_data["stage11_special"]
+                if "area_attack_range" in enemy_data:
+                    enemy.area_attack_range = enemy_data["area_attack_range"]
+                    
                 enemies.append(enemy)
             
             items = []
@@ -187,7 +194,8 @@ class APILayer:
                 max_turns=stage.constraints.get("max_turns", 100),
                 player_hp=stage.player_hp,
                 player_max_hp=stage.player_max_hp,
-                player_attack_power=stage.player_attack_power
+                player_attack_power=stage.player_attack_power,
+                stage_id=stage_id  # ⚠️ 重要: Stage11の特殊処理のためにstage_idを渡す
             )
             
             # API制限設定
@@ -695,13 +703,7 @@ class APILayer:
             self._ensure_initialized()
             self._check_api_allowed("see")
             
-            # アクション履歴追跡
-            if self.action_tracker:
-                self.action_tracker.track_action("see")
-            
-            # 実行制御の待機処理
-            if self.execution_controller:
-                self.execution_controller.wait_for_action()
+            # see()は情報取得のみでターン消費しないため、実行制御・履歴追跡を除外
             
             game_state = self.game_manager.get_current_state()
             if game_state is None:
@@ -771,11 +773,27 @@ class APILayer:
                 # 敵チェック
                 enemy = game_state.get_enemy_at(check_pos)
                 if enemy:
-                    result["surroundings"][dir_name] = {
+                    enemy_info = {
                         "type": "enemy",
                         "enemy_type": enemy.enemy_type.value,
-                        "hp": enemy.hp
+                        "position": [enemy.position.x, enemy.position.y],
+                        "hp": enemy.hp,
+                        "max_hp": enemy.max_hp,
+                        "attack_power": enemy.attack_power,
+                        "direction": enemy.direction.value,
+                        "is_alive": enemy.is_alive(),
+                        "alerted": enemy.alerted  # 怒りモード等の判定用
                     }
+                    
+                    # AdvancedEnemyの場合は追加情報
+                    if hasattr(enemy, 'movement_mode'):
+                        enemy_info["movement_mode"] = enemy.movement_mode
+                    if hasattr(enemy, 'vision_range'):
+                        enemy_info["vision_range"] = enemy.vision_range
+                    if hasattr(enemy, 'current_state'):
+                        enemy_info["state"] = enemy.current_state.value
+                    
+                    result["surroundings"][dir_name] = enemy_info
                     continue
                 
                 # アイテムチェック
@@ -837,6 +855,9 @@ class APILayer:
                     enemy_info["vision_range"] = enemy.vision_range
                 if hasattr(enemy, 'current_state'):
                     enemy_info["state"] = enemy.current_state.value
+                    
+                # 全ステージ共通の追加状態情報（必要に応じて）
+                # alertedフラグで怒りモード等を判定可能
                 
                 result["enemies"].append(enemy_info)
             

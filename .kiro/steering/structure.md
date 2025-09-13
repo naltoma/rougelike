@@ -10,7 +10,8 @@ rougelike/
 │       └── gui-critical-fixes-v1.2.1/  # 🆕 v1.2.1 Critical button fixes spec
 ├── .claude/            # Claude Code commands
 ├── docs/               # Project documentation
-│   ├── v1.2.7.md       # 📋 v1.2.7 TODOs (pickup機能導入・wait機能・敵AI移動ルーチン)
+│   ├── v1.2.8.md       # 🏟️ v1.2.8 TODOs (特殊条件付きステージ・大型敵・特殊敵システム)
+│   ├── v1.2.7.md       # 🛡️ v1.2.7 Wait API & Enemy AI Vision System documentation (COMPLETED)
 │   ├── v1.2.6.md       # ⚔️ v1.2.6 Attack System Integration documentation (COMPLETED)
 │   ├── v1.2.5.md       # 🚀 v1.2.5 Continue Execution Speed Control documentation (COMPLETED)
 │   ├── v1.2.4.md       # 📋 v1.2.4 Initial Execution Behavior Enhancement documentation (COMPLETED)
@@ -22,11 +23,11 @@ rougelike/
 │   ├── teacher_setup_guide.md   # 教員向けWebhookセットアップガイド
 │   ├── student_setup_guide.md   # 学生向けWebhookセットアップガイド
 │   └── v0_1st_plan.md  # Original planning documents
-├── engine/             # Core game engine (40+ files + v1.2.6 attack system integration)
-├── stages/             # YAML stage definitions (stage01-06 implemented)
+├── engine/             # Core game engine (40+ files + v1.2.7 wait API & enemy AI vision system integration)
+├── stages/             # YAML stage definitions (stage01-10 implemented)
 ├── tests/              # Comprehensive test suite (32+ files)
 ├── temp/               # Temporary files and screenshots
-├── main.py             # Entry point (v1.2.6 GUI + attack system + enemy info panel)
+├── main.py             # Entry point (v1.2.7 GUI + wait API + enemy AI vision system)
 ├── student_example.py  # Student sample code
 ├── upload_webhook.py   # Webhook upload tool (v1.2.3)
 ├── test_multiple_students.py  # Multiple students test tool (v1.2.3)
@@ -41,7 +42,7 @@ rougelike/
 
 ## Subdirectory Structures
 
-### `/engine/` - Core Game Engine (v1.2.6 - Attack System Integration Complete)
+### `/engine/` - Core Game Engine (v1.2.7 - Wait API & Enemy AI Vision System Complete)
 ```
 engine/
 ├── __init__.py                 # Core data models (9,705 bytes)
@@ -131,8 +132,14 @@ stages/
 ├── stage04.yml         # ⚔️ Basic attack (HP10 enemy) - v1.2.6 COMPLETED
 ├── stage05.yml         # ⚔️ 3-attack strategy (HP90 enemy) - v1.2.6 COMPLETED
 ├── stage06.yml         # ⚔️ 10-attack long battle (HP300 enemy) - v1.2.6 COMPLETED
-├── stage07-09.yml      # 📋 Pickup + wait phases - v1.2.7 PLANNED
-├── stage10-16.yml      # Advanced stages (10x10, enemies, items)
+├── stage07.yml         # 🛡️ Wait API & enemy behavior observation - v1.2.7 COMPLETED
+├── stage08.yml         # 🛡️ Enemy vision avoidance & timing strategy - v1.2.7 COMPLETED
+├── stage09.yml         # 🛡️ Complex enemy AI & patrol pattern avoidance - v1.2.7 COMPLETED
+├── stage10.yml         # 🛡️ Advanced tactical thinking & enemy AI prediction - v1.2.7 COMPLETED
+├── stage11.yml         # 🏟️ Special conditional stage (large 2x2 enemy) - v1.2.8 PLANNED
+├── stage12.yml         # 🏟️ Special conditional stage (large 2x2+3x3 enemies) - v1.2.8 PLANNED
+├── stage13.yml         # 🏟️ Special conditional stage (special 2x3 enemy) - v1.2.8 PLANNED
+├── stage14-16.yml      # Future advanced stages (placeholder)
 └── random/             # Random generation templates
     ├── R1-movement.yml
     ├── R2-attack.yml
@@ -200,6 +207,13 @@ Player attack() -> Combat System -> Enemy Counter-Attack
 Damage Calculation -> Enemy HP Update -> Direction Change + Attack
      ↓                   ↓                    ↓
 GUI Enemy Info Panel -> Real-time HP Display -> Turn-based Combat
+
+🛡️ v1.2.7 Wait API & Enemy AI Vision System Flow:
+Player wait() -> Enemy Action Observation -> AI Behavior Analysis
+     ↓                    ↓                         ↓
+Tactical Timing -> Directional Vision System -> Wall Occlusion Check
+     ↓                    ↓                         ↓
+Alert/Chase Mode -> Patrol Pattern Recognition -> Strategic Planning
 ```
 
 ## File Naming Conventions
@@ -284,9 +298,9 @@ from engine.renderer import GuiRenderer, CuiRenderer
 4. **Student API**: Update `/engine/api.py` if needed
 5. **Documentation**: Update README.md and `/docs/`
 
-## Testing Strategy (v1.2.6 - pytest + Attack System Integration Validated)
-- **Comprehensive Coverage**: 32+ test files covering all 40+ engine components (including v1.2.6)  
-- **Test Success Rate**: 88.9% (maintained through v1.2.6 integration)
+## Testing Strategy (v1.2.7 - pytest + Wait API & Enemy AI Vision System Validated)
+- **Comprehensive Coverage**: 32+ test files covering all 40+ engine components (including v1.2.7)  
+- **Test Success Rate**: 88.9% (maintained through v1.2.7 integration)
 - **pytest Integration**: Full pytest framework with markers and plugins
 - **Test Categories**:
   - Unit tests: Isolated component testing
@@ -300,6 +314,7 @@ from engine.renderer import GuiRenderer, CuiRenderer
   - **✅ v1.2.4 tests**: Initial confirmation mode validation, stage description rendering, conditional session logging (COMPLETED)
   - **✅ v1.2.5 tests**: 7-stage speed control validation, ultra high-speed execution testing, speed control error handling (COMPLETED)
   - **⚔️ v1.2.6 tests**: Attack system integration testing, enemy counter-attack validation, stage04-06 testing (COMPLETED)
+  - **🛡️ v1.2.7 tests**: Wait API integration testing, enemy AI vision system validation, stage07-10 testing (COMPLETED)
 - **Advanced Features**:
   - Test markers: unit/integration/gui classification
   - Failed test analysis and re-run commands
@@ -308,3 +323,4 @@ from engine.renderer import GuiRenderer, CuiRenderer
   - HTML/JSON test reports
 - **Quality Assurance**: Automated quality metrics and test-driven development
 - **⚔️ v1.2.6 Test Coverage**: Attack system integration, combat system testing, enemy AI counter-attack validation, stage04-06 testing (COMPLETED)
+- **🛡️ v1.2.7 Test Coverage**: Wait API integration, enemy AI vision system testing, directional sight validation, stage07-10 testing (COMPLETED)

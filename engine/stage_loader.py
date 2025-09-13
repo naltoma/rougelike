@@ -206,6 +206,19 @@ class StageLoader:
                           "goblin", "orc", "dragon", "boss"]
             if enemy_type not in valid_types:
                 raise StageValidationError(f"enemies[{i}].typeは {valid_types} のいずれかである必要があります: {enemy_type}")
+            
+            # behavior フィールドの検証（オプション）
+            if "behavior" in enemy_data:
+                behavior = enemy_data["behavior"]
+                valid_behaviors = ["guard", "patrol", "passive", "stage11_special", "conditional"]
+                if behavior not in valid_behaviors:
+                    raise StageValidationError(f"enemies[{i}].behaviorは {valid_behaviors} のいずれかである必要があります: {behavior}")
+            
+            # v1.2.8 拡張属性の検証
+            if enemy_type in ["large_2x2", "large_3x3"]:
+                self._validate_large_enemy_attributes(enemy_data, i)
+            elif enemy_type == "special_2x3":
+                self._validate_special_enemy_attributes(enemy_data, i)
     
     def _validate_items(self, items_data: List[Dict[str, Any]]) -> None:
         """アイテムデータの検証"""
@@ -254,6 +267,82 @@ class StageLoader:
             for api in allowed_apis:
                 if api not in valid_apis:
                     raise StageValidationError(f"無効なAPI: {api}. 有効なAPI: {valid_apis}")
+    
+    def _validate_large_enemy_attributes(self, enemy_data: Dict[str, Any], index: int) -> None:
+        """大型敵の拡張属性検証"""
+        # rage_threshold の検証（オプション）
+        if "rage_threshold" in enemy_data:
+            rage_threshold = enemy_data["rage_threshold"]
+            if not isinstance(rage_threshold, (int, float)):
+                raise StageValidationError(f"enemies[{index}].rage_thresholdは数値である必要があります")
+            if not (0.0 <= rage_threshold <= 1.0):
+                raise StageValidationError(f"enemies[{index}].rage_thresholdは0.0-1.0の範囲である必要があります: {rage_threshold}")
+        
+        # area_attack_range の検証（オプション）
+        if "area_attack_range" in enemy_data:
+            area_attack_range = enemy_data["area_attack_range"]
+            if not isinstance(area_attack_range, int):
+                raise StageValidationError(f"enemies[{index}].area_attack_rangeは整数である必要があります")
+            if area_attack_range < 1:
+                raise StageValidationError(f"enemies[{index}].area_attack_rangeは1以上である必要があります: {area_attack_range}")
+        
+        # HP関連の検証（オプション）
+        if "hp" in enemy_data:
+            hp = enemy_data["hp"]
+            if not isinstance(hp, int) or hp <= 0:
+                raise StageValidationError(f"enemies[{index}].hpは正の整数である必要があります: {hp}")
+        
+        if "max_hp" in enemy_data:
+            max_hp = enemy_data["max_hp"]
+            if not isinstance(max_hp, int) or max_hp <= 0:
+                raise StageValidationError(f"enemies[{index}].max_hpは正の整数である必要があります: {max_hp}")
+        
+        # HPと最大HPの関係性チェック
+        if "hp" in enemy_data and "max_hp" in enemy_data:
+            if enemy_data["hp"] > enemy_data["max_hp"]:
+                raise StageValidationError(f"enemies[{index}].hpはmax_hp以下である必要があります")
+        
+        # stage11_special フィールドの検証（オプション）
+        if "stage11_special" in enemy_data:
+            stage11_special = enemy_data["stage11_special"]
+            if not isinstance(stage11_special, bool):
+                raise StageValidationError(f"enemies[{index}].stage11_specialはbool型である必要があります")
+    
+    def _validate_special_enemy_attributes(self, enemy_data: Dict[str, Any], index: int) -> None:
+        """特殊敵の拡張属性検証"""
+        # special_conditions の検証（オプション）
+        if "special_conditions" in enemy_data:
+            conditions = enemy_data["special_conditions"]
+            if not isinstance(conditions, dict):
+                raise StageValidationError(f"enemies[{index}].special_conditionsは辞書形式である必要があります")
+            
+            # required_sequence の検証
+            if "required_sequence" in conditions:
+                sequence = conditions["required_sequence"]
+                if not isinstance(sequence, list):
+                    raise StageValidationError(f"enemies[{index}].special_conditions.required_sequenceはリスト形式である必要があります")
+                
+                valid_actions = ["move", "turn_left", "turn_right", "attack", "pickup", "wait", "see"]
+                for j, action in enumerate(sequence):
+                    if action not in valid_actions:
+                        raise StageValidationError(f"enemies[{index}].special_conditions.required_sequence[{j}]は有効なアクション({valid_actions})である必要があります: {action}")
+        
+        # HP関連の検証（特殊敵は通常高HP）
+        if "hp" in enemy_data:
+            hp = enemy_data["hp"]
+            if not isinstance(hp, int) or hp <= 0:
+                raise StageValidationError(f"enemies[{index}].hpは正の整数である必要があります: {hp}")
+        
+        if "max_hp" in enemy_data:
+            max_hp = enemy_data["max_hp"]
+            if not isinstance(max_hp, int) or max_hp <= 0:
+                raise StageValidationError(f"enemies[{index}].max_hpは正の整数である必要があります: {max_hp}")
+        
+        # 攻撃力の検証（特殊敵は通常高攻撃力）
+        if "attack_power" in enemy_data:
+            attack_power = enemy_data["attack_power"]
+            if not isinstance(attack_power, int) or attack_power < 0:
+                raise StageValidationError(f"enemies[{index}].attack_powerは0以上の整数である必要があります: {attack_power}")
     
     def _build_stage(self, data: Dict[str, Any]) -> Stage:
         """検証済みデータからStageオブジェクトを構築"""
@@ -378,7 +467,42 @@ class StageLoader:
             "goal": {
                 "position": [4, 4]
             },
-            "enemies": [],
+            "enemies": [
+                # 通常敵の例
+                {
+                    "id": "normal_enemy",
+                    "type": "normal",
+                    "position": [2, 2],
+                    "direction": "N",
+                    "hp": 50,
+                    "attack_power": 20
+                },
+                # 大型敵の例（コメントアウト）
+                # {
+                #     "id": "large_guardian",
+                #     "type": "large_2x2",
+                #     "position": [1, 1],
+                #     "direction": "E",
+                #     "hp": 150,
+                #     "max_hp": 150,
+                #     "attack_power": 30,
+                #     "rage_threshold": 0.5,
+                #     "area_attack_range": 2
+                # },
+                # 特殊敵の例（コメントアウト）
+                # {
+                #     "id": "conditional_boss",
+                #     "type": "special_2x3",
+                #     "position": [3, 3],
+                #     "direction": "S",
+                #     "hp": 10000,
+                #     "max_hp": 10000,
+                #     "attack_power": 10000,
+                #     "special_conditions": {
+                #         "required_sequence": ["move", "move", "attack"]
+                #     }
+                # }
+            ],
             "items": [],
             "constraints": {
                 "max_turns": 50,

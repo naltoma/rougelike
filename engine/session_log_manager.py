@@ -11,6 +11,7 @@ from datetime import datetime
 from enum import Enum
 
 from .session_logging import SessionLogger, LogLevel, EventType
+from .learning_analytics import LearningAnalytics, LearningAnalyticsEntry
 
 logger = logging.getLogger(__name__)
 
@@ -193,6 +194,10 @@ class SessionLogManager:
         self._max_file_size = 10 * 1024 * 1024  # 10MB
         self._max_log_files = 100
         self._google_sheets_enabled = False
+        
+        # v1.2.8 学習支援アナリティクス統合
+        self.learning_analytics: Optional[LearningAnalytics] = None
+        self.analytics_enabled = False
         
         logger.debug("SessionLogManager初期化完了")
     
@@ -1262,3 +1267,188 @@ class SessionLogManager:
             
         except Exception as e:
             logger.error(f"クリーンアップ中にエラー: {e}")
+    
+    # v1.2.8 学習支援アナリティクス機能
+    def enable_learning_analytics(self) -> bool:
+        """学習支援アナリティクス機能を有効化"""
+        try:
+            self.learning_analytics = LearningAnalytics()
+            self.analytics_enabled = True
+            
+            logger.info("学習支援アナリティクス機能が有効化されました")
+            return True
+            
+        except Exception as e:
+            logger.error(f"学習アナリティクス有効化中にエラー: {e}")
+            return False
+    
+    def start_learning_session(self, student_log_data: Dict[str, Any]) -> Optional[LearningAnalyticsEntry]:
+        """学習セッションを開始"""
+        if not self.analytics_enabled or not self.learning_analytics:
+            return None
+        
+        try:
+            from .session_data_models import StudentLogEntry
+            from datetime import datetime
+            
+            # StudentLogEntryを作成
+            student_log = StudentLogEntry(
+                student_id=student_log_data.get("student_id", "unknown"),
+                session_id=student_log_data.get("session_id", "unknown"),
+                stage=student_log_data.get("stage", "unknown"),
+                timestamp=datetime.now(),
+                level=student_log_data.get("level", 1),
+                hp=student_log_data.get("hp", 100),
+                max_hp=student_log_data.get("max_hp", 100),
+                position=student_log_data.get("position", (0, 0))
+            )
+            
+            return self.learning_analytics.start_session(student_log)
+            
+        except Exception as e:
+            logger.error(f"学習セッション開始中にエラー: {e}")
+            return None
+    
+    def record_enemy_interaction(self, enemy_data: Dict[str, Any], game_state: Any = None):
+        """敵との相互作用を記録"""
+        if not self.analytics_enabled or not self.learning_analytics:
+            return
+        
+        try:
+            self.learning_analytics.record_enemy_encounter(enemy_data, game_state)
+        except Exception as e:
+            logger.error(f"敵相互作用記録中にエラー: {e}")
+    
+    def record_special_stage_error(self, error_type: str, message: str, hint: str):
+        """特殊ステージのエラーとヒントを記録"""
+        if not self.analytics_enabled or not self.learning_analytics:
+            return
+        
+        try:
+            self.learning_analytics.record_special_error(error_type, message, hint)
+        except Exception as e:
+            logger.error(f"特殊エラー記録中にエラー: {e}")
+    
+    def record_command_usage(self, command_name: str):
+        """コマンド使用状況を記録"""
+        if not self.analytics_enabled or not self.learning_analytics:
+            return
+        
+        try:
+            self.learning_analytics.record_command_usage(command_name)
+        except Exception as e:
+            logger.error(f"コマンド使用記録中にエラー: {e}")
+    
+    def update_learning_objective(self, objective_index: int, achieved: bool = True):
+        """学習目標の達成状況を更新"""
+        if not self.analytics_enabled or not self.learning_analytics:
+            return
+        
+        try:
+            self.learning_analytics.update_objective_achievement(objective_index, achieved)
+        except Exception as e:
+            logger.error(f"学習目標更新中にエラー: {e}")
+    
+    def end_learning_session(self) -> Optional[LearningAnalyticsEntry]:
+        """学習セッションを終了して分析結果を取得"""
+        if not self.analytics_enabled or not self.learning_analytics:
+            return None
+        
+        try:
+            return self.learning_analytics.end_session()
+        except Exception as e:
+            logger.error(f"学習セッション終了中にエラー: {e}")
+            return None
+    
+    def get_learning_recommendations(self) -> List[str]:
+        """現在の学習推奨事項を取得"""
+        if not self.analytics_enabled or not self.learning_analytics:
+            return []
+        
+        try:
+            return self.learning_analytics.get_learning_recommendations()
+        except Exception as e:
+            logger.error(f"学習推奨事項取得中にエラー: {e}")
+            return []
+    
+    def export_analytics_data(self, output_path: Optional[Path] = None) -> Optional[Path]:
+        """学習アナリティクスデータをエクスポート"""
+        if not self.analytics_enabled or not self.learning_analytics:
+            return None
+        
+        try:
+            import json
+            import config
+            
+            if output_path is None:
+                export_dir = config.ROOT_DIR / "data" / "analytics"
+                export_dir.mkdir(parents=True, exist_ok=True)
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                output_path = export_dir / f"learning_analytics_{timestamp}.json"
+            
+            # アナリティクスデータを辞書形式に変換
+            analytics_data = {
+                "export_timestamp": datetime.now().isoformat(),
+                "total_sessions": len(self.learning_analytics.analytics_history),
+                "current_session": (
+                    self.learning_analytics.current_entry.to_dict() 
+                    if self.learning_analytics.current_entry else None
+                ),
+                "session_history": [
+                    entry.to_dict() for entry in self.learning_analytics.analytics_history
+                ]
+            }
+            
+            with open(output_path, 'w', encoding='utf-8') as f:
+                json.dump(analytics_data, f, ensure_ascii=False, indent=2)
+            
+            logger.info(f"学習アナリティクスデータをエクスポート: {output_path}")
+            return output_path
+            
+        except Exception as e:
+            logger.error(f"アナリティクスデータエクスポート中にエラー: {e}")
+            return None
+    
+    def is_analytics_enabled(self) -> bool:
+        """学習アナリティクス機能の有効性を確認"""
+        return self.analytics_enabled
+    
+    def show_analytics_summary(self):
+        """学習アナリティクスの概要を表示"""
+        if not self.analytics_enabled or not self.learning_analytics:
+            print("学習アナリティクス機能が無効です")
+            return
+        
+        try:
+            print("\n📊 学習アナリティクス概要")
+            print("=" * 50)
+            
+            if self.learning_analytics.current_entry:
+                current = self.learning_analytics.current_entry
+                print(f"📍 現在のセッション:")
+                print(f"  • ステージ: {current.student_log.stage}")
+                print(f"  • 学習段階: {current.learning_phase.value}")
+                print(f"  • 難易度: {current.difficulty_level.value}")
+                print(f"  • see()使用回数: {current.see_command_usage}")
+                print(f"  • wait()使用回数: {current.wait_command_usage}")
+                print(f"  • 敵遭遇回数: {len(current.enemy_encounters)}")
+                
+                if current.special_stage_progress:
+                    achieved = sum(current.special_stage_progress.objectives_achieved)
+                    total = len(current.special_stage_progress.objectives_achieved)
+                    print(f"  • 学習目標達成: {achieved}/{total}")
+            
+            history_count = len(self.learning_analytics.analytics_history)
+            print(f"\n📈 履歴セッション数: {history_count}")
+            
+            recommendations = self.get_learning_recommendations()
+            if recommendations:
+                print("\n💡 学習推奨事項:")
+                for rec in recommendations:
+                    print(f"   • {rec}")
+            
+            print()
+            
+        except Exception as e:
+            logger.error(f"アナリティクス概要表示中にエラー: {e}")
+            print(f"❌ アナリティクス概要の表示に失敗しました: {e}")

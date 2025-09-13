@@ -93,8 +93,8 @@ class StageDescriptionRenderer:
         # プレイヤー初期ステータス
         lines.append("")
         lines.append("🎮 プレイヤー初期ステータス:")
-        lines.append("   HP: 100")
-        lines.append("   攻撃力: 30")
+        lines.append(f"   HP: {stage.player_hp if stage.player_hp is not None else 100}")
+        lines.append(f"   攻撃力: {stage.player_attack_power if stage.player_attack_power is not None else 20}")
         lines.append("   向き: " + {"N": "北(↑)", "E": "東(→)", "S": "南(↓)", "W": "西(←)"}.get(stage.player_direction.value, stage.player_direction.value))
         lines.append("")
         
@@ -302,7 +302,23 @@ class StageDescriptionRenderer:
         """
         hints = []
         
-        # ステージ固有のヒント
+        # v1.2.8: YAMLファイルから直接ヒントを読み込む
+        try:
+            import yaml
+            stage_file = self.stage_loader.stages_directory / f"{stage.id}.yml"
+            
+            if stage_file.exists():
+                with open(stage_file, 'r', encoding='utf-8') as f:
+                    stage_data = yaml.safe_load(f)
+                    yaml_hints = stage_data.get("hints", [])
+                    if yaml_hints:
+                        # YAMLのヒントをそのまま使用
+                        hints.extend(yaml_hints)
+                        return hints
+        except Exception as e:
+            logger.warning(f"YAMLヒント読み込みエラー {stage.id}: {e}")
+        
+        # フォールバック: 従来のハードコードされたヒント
         if stage.id == "stage04":
             hints.append("attack()関数を使って正面の敵を攻撃できます")
             hints.append("敵を倒してからゴールに向かいましょう")

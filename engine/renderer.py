@@ -277,6 +277,13 @@ class GuiRenderer(Renderer):
             'text_bg': (255, 255, 255),         # 白（テキスト背景）
             'vision_normal': (255, 100, 100),   # 敵視野（薄い赤）- 敵が非警戒状態の視野範囲
             'vision_alerted': (255, 50, 50),    # 警戒中敵視野（濃い赤）- プレイヤー発見後の警戒状態視野
+            # v1.2.8 特殊条件付きステージ - 敵モード別色定義
+            'enemy_calm': (255, 0, 0),          # 平常モード（通常の赤）
+            'enemy_rage': (255, 100, 0),        # 怒りモード（オレンジ）
+            'enemy_transitioning': (255, 150, 0), # 状態遷移中（薄いオレンジ）
+            'enemy_hunting': (150, 0, 150),     # 追跡モード（紫）
+            'enemy_special': (255, 0, 255),     # 特殊敵（マゼンタ）
+            'area_attack_range': (255, 200, 0), # 範囲攻撃範囲（黄色）
         }
         
         # UI設定（文字省略防止のため大幅拡大）
@@ -366,9 +373,10 @@ class GuiRenderer(Renderer):
         game_area_width = self.width * self.cell_size
         game_area_height = self.height * self.cell_size
         
-        # サイドバーに必要な最小高さを計算
-        # ヘッダー(30) + プレイヤー情報(130) + 敵情報(最大2体×90=180) + 凡例(150) + 余裕(50)
-        min_sidebar_height = 30 + 130 + 180 + 150 + 50  # 合計540px
+        # サイドバーに必要な最小高さを計算（動的計算用の初期値）
+        # 初期化時はゲーム状態が不明なので、最大ケースを想定
+        # ヘッダー(30) + プレイヤー情報(130) + 敵情報(最大2体×90=180) + 凡例(最大9項目×18=162) + 余裕(50)
+        min_sidebar_height = 30 + 130 + 180 + 162 + 50  # 合計552px
         
         # 情報パネル・コントロールパネルの720px幅を考慮した画面サイズ計算
         info_control_width = 720  # 情報パネルとコントロールパネルの幅
@@ -470,6 +478,9 @@ class GuiRenderer(Renderer):
         if self.show_enemy_vision:
             self._draw_enemy_vision(game_state, start_x, start_y)
         
+        # 範囲攻撃範囲を描画（半透明オーバーレイ）- v1.2.8特殊条件付きステージ
+        self._draw_area_attack_range(game_state, start_x, start_y)
+        
         # プレイヤーの向きを矢印で表示
         self._draw_player_direction(game_state.player, start_x, start_y)
         
@@ -497,10 +508,24 @@ class GuiRenderer(Renderer):
         if game_state.goal_position and pos == game_state.goal_position:
             return 'goal'
         
-        # 敵チェック
+        # 敵チェック（v1.2.8: モード別色分け対応）
         for enemy in game_state.enemies:
             if pos in enemy.get_occupied_positions():
-                return 'enemy'
+                # 敵のモードに基づいて色を決定
+                if hasattr(enemy, 'enemy_mode'):
+                    from . import EnemyMode, EnemyType
+                    if enemy.enemy_type == EnemyType.SPECIAL_2X3:
+                        return 'enemy_special'
+                    elif enemy.enemy_mode == EnemyMode.RAGE:
+                        return 'enemy_rage'
+                    elif enemy.enemy_mode == EnemyMode.TRANSITIONING:
+                        return 'enemy_transitioning'
+                    elif enemy.enemy_mode == EnemyMode.HUNTING:
+                        return 'enemy_hunting'
+                    else:  # CALM mode
+                        return 'enemy_calm'
+                else:
+                    return 'enemy'
         
         # アイテムチェック
         for item in game_state.items:
@@ -578,8 +603,71 @@ class GuiRenderer(Renderer):
         # インデックス番号を描画
         self.screen.blit(index_surface, (text_x, text_y))
     
+    def _get_dynamic_legend_items(self, game_state: GameState) -> List[Tuple[str, Tuple[int, int, int], str]]:
+        """ゲーム状態に応じて動的に凡例項目を生成"""
+        legend_items = [
+            ("■", self.colors['player'], "Player"),
+            ("■", self.colors['goal'], "Goal"),
+        ]
+        
+        # 壁の存在チェック
+        if game_state.board.walls:
+            legend_items.append(("■", self.colors['wall'], "Wall"))
+        
+        # 敵の存在チェック
+        alive_enemies = [enemy for enemy in game_state.enemies if enemy.is_alive()]
+        if alive_enemies:
+            legend_items.append(("■", self.colors['enemy'], "Enemy"))
+            
+            # 敵視野項目は敵がいる場合のみ表示
+            legend_items.extend([
+                ("▢", self.colors['vision_normal'], "Enemy Vision"),
+                ("▦", self.colors['vision_alerted'], "Alert Vision"),
+            ])
+        
+        # アイテムの存在チェック
+        if game_state.items:
+            legend_items.append(("■", self.colors['item'], "Item"))
+        
+        # 禁止マスの存在チェック
+        if game_state.board.forbidden_cells:
+            legend_items.append(("■", self.colors['forbidden'], "Blocked"))
+        
+        # 空マスは常に表示
+        legend_items.append(("■", self.colors['empty'], "Empty"))
+        
+        return legend_items
+
+    def _calculate_dynamic_sidebar_height(self, game_state: GameState) -> int:
+        """ゲーム状態に基づいてサイドバーの必要高さを計算"""
+        base_height = 30  # ヘッダー
+        base_height += 130  # プレイヤー情報
+        
+        # 敵情報の高さを動的計算
+        alive_enemies = [enemy for enemy in game_state.enemies if enemy.is_alive()]
+        max_displayed_enemies = min(len(alive_enemies), 2)  # 最大2体まで表示
+        enemy_section_height = 30  # "Enemy Info"ヘッダー
+        for i in range(max_displayed_enemies):
+            enemy = alive_enemies[i]
+            lines_per_enemy = 5  # 基本情報: type, pos, dir, hp, atk
+            if hasattr(enemy, 'enemy_mode'):
+                lines_per_enemy += 1  # Mode情報
+                if hasattr(enemy, 'rage_state') and enemy.rage_state and enemy.rage_state.is_active:
+                    lines_per_enemy += 1  # Rage情報
+            enemy_section_height += lines_per_enemy * 18 + 5  # 敵間スペース
+        base_height += enemy_section_height
+        
+        # 凡例の高さを動的計算
+        legend_items = self._get_dynamic_legend_items(game_state)
+        legend_height = 30 + len(legend_items) * 18  # "Legend"ヘッダー + 各項目
+        base_height += legend_height
+        
+        base_height += 50  # 余裕のマージン
+        
+        return base_height
+
     def _draw_sidebar(self, game_state: GameState) -> None:
-        """サイドバーを描画（左側に配置）"""
+        """サイドバーを描画（左側に配置）- 動的高さ調整対応"""
         sidebar_x = self.margin  # 左側に配置
         sidebar_y = self.margin + self.control_panel_height + self.margin  # ゲームエリアと同じY座標
         
@@ -588,11 +676,10 @@ class GuiRenderer(Renderer):
         stage_info_surface = self.small_font.render(stage_info_text, True, self.colors['text'])
         self.screen.blit(stage_info_surface, (self.margin, self.margin + 5))
         
-        # サイドバー背景（十分に高く - 全ての要素が収まるように）
-        # 最小高さは初期化時に計算済みなので、同じ値を使用
-        min_sidebar_height = 30 + 130 + 180 + 150 + 50  # ヘッダー + プレイヤー情報 + 敵情報 + 凡例 + 余裕
+        # サイドバー背景（動的高さ計算）
+        dynamic_sidebar_height = self._calculate_dynamic_sidebar_height(game_state)
         calculated_height = self.height * self.cell_size
-        sidebar_height = max(calculated_height, min_sidebar_height)
+        sidebar_height = max(calculated_height, dynamic_sidebar_height)
         sidebar_rect = pygame.Rect(sidebar_x, sidebar_y, 
                                  self.sidebar_width, 
                                  sidebar_height)
@@ -626,6 +713,7 @@ class GuiRenderer(Renderer):
             for original_index, (list_index, enemy) in enumerate(alive_enemies[:2]):  # 最大2体まで表示
                 # 元のリスト内でのインデックス（1から始まる）を使用
                 display_index = list_index + 1
+                # v1.2.8: 敵モード状態情報追加
                 enemy_info = [
                     f"Enemy {display_index}: {enemy.enemy_type.value}",
                     f"Pos: ({enemy.position.x}, {enemy.position.y})",
@@ -633,6 +721,17 @@ class GuiRenderer(Renderer):
                     f"HP: {enemy.hp}/{enemy.max_hp}",
                     f"ATK: {enemy.attack_power}"
                 ]
+                
+                # 敵モード情報追加
+                if hasattr(enemy, 'enemy_mode'):
+                    mode_display = self._get_enemy_mode_display(enemy)
+                    enemy_info.append(f"Mode: {mode_display}")
+                    
+                    # 怒りモード詳細情報
+                    if hasattr(enemy, 'rage_state') and enemy.rage_state:
+                        if enemy.rage_state.is_active:
+                            hp_ratio = enemy.hp / enemy.max_hp
+                            enemy_info.append(f"Rage: {hp_ratio:.0%} HP")
                 
                 for info in enemy_info:
                     self._draw_text(info, sidebar_x + 20, y_offset, self.small_font)
@@ -644,21 +743,12 @@ class GuiRenderer(Renderer):
         
         y_offset += 10
         
-        # 凡例
+        # 凡例（動的生成）
         self._draw_text("Legend", sidebar_x + 10, y_offset, self.font)
         y_offset += 30
         
-        legend_items = [
-            ("■", self.colors['player'], "Player"),
-            ("■", self.colors['goal'], "Goal"),
-            ("■", self.colors['wall'], "Wall"),
-            ("■", self.colors['enemy'], "Enemy"),
-            ("■", self.colors['item'], "Item"),
-            ("■", self.colors['forbidden'], "Blocked"),
-            ("■", self.colors['empty'], "Empty"),
-            ("▢", self.colors['vision_normal'], "Enemy Vision"),
-            ("▦", self.colors['vision_alerted'], "Alert Vision"),
-        ]
+        # ゲーム状態に基づいて動的に凡例項目を生成
+        legend_items = self._get_dynamic_legend_items(game_state)
         
         for symbol, color, description in legend_items:
             # カラーボックスを描画
@@ -1420,6 +1510,85 @@ class GuiRenderer(Renderer):
             return True
         
         return False
+    
+    def _get_enemy_mode_display(self, enemy) -> str:
+        """敵モード表示名取得 - v1.2.8特殊条件付きステージ"""
+        from . import EnemyMode
+        
+        mode_names = {
+            EnemyMode.CALM: "Calm",
+            EnemyMode.RAGE: "Rage",
+            EnemyMode.TRANSITIONING: "Trans",
+            EnemyMode.HUNTING: "Hunt"
+        }
+        
+        return mode_names.get(enemy.enemy_mode, "Unknown")
+    
+    def _draw_area_attack_range(self, game_state: GameState, start_x: int, start_y: int) -> None:
+        """範囲攻撃範囲視覚化 - v1.2.8特殊条件付きステージ"""
+        from .enemy_system import LargeEnemySystem
+        from . import EnemyMode
+        
+        # 仮の大型敵システム作成（実際の実装では外部から渡される）
+        large_enemy_system = LargeEnemySystem()
+        
+        for i, enemy in enumerate(game_state.enemies):
+            if not enemy.is_alive():
+                continue
+            
+            # Stage11専用範囲攻撃描画
+            if hasattr(enemy, 'stage11_area_attack_active') and enemy.stage11_area_attack_active:
+                if hasattr(enemy, 'stage11_attack_range'):
+                    # Stage11専用範囲攻撃描画
+                    for attack_pos in enemy.stage11_attack_range:
+                        # 画面範囲内かチェック
+                        if (0 <= attack_pos.x < self.width and 
+                            0 <= attack_pos.y < self.height):
+                            # 攻撃範囲セルを描画（黄色でハイライト）
+                            cell_rect = pygame.Rect(
+                                start_x + attack_pos.x * self.cell_size,
+                                start_y + attack_pos.y * self.cell_size,
+                                self.cell_size,
+                                self.cell_size
+                            )
+                            
+                            # 範囲攻撃色（透明度付き）
+                            range_surface = pygame.Surface((self.cell_size, self.cell_size))
+                            range_surface.set_alpha(180)  # 透明度設定
+                            range_surface.fill(self.colors['area_attack_range'])
+                            self.screen.blit(range_surface, cell_rect)
+                            
+                            # 範囲攻撃境界線
+                            pygame.draw.rect(self.screen, (255, 100, 0), cell_rect, 2)
+                            
+            # 怒りモードの大型敵のみ範囲攻撃表示
+            elif (hasattr(enemy, 'enemy_mode') and 
+                enemy.enemy_mode == EnemyMode.RAGE and 
+                hasattr(enemy, 'enemy_type')):
+                
+                from . import EnemyType
+                if enemy.enemy_type in [EnemyType.LARGE_2X2, EnemyType.LARGE_3X3]:
+                    # 大型敵システムに一時登録して範囲取得
+                    enemy_id = f"temp_{i}"
+                    large_enemy_system.large_enemies[enemy_id] = enemy
+                    
+                    attack_range = large_enemy_system.get_area_attack_range(enemy_id)
+                    
+                    # 範囲攻撃セルを描画
+                    for attack_pos in attack_range:
+                        if 0 <= attack_pos.x < self.width and 0 <= attack_pos.y < self.height:
+                            cell_x = start_x + attack_pos.x * self.cell_size
+                            cell_y = start_y + attack_pos.y * self.cell_size
+                            
+                            # 半透明の黄色オーバーレイ
+                            range_surface = pygame.Surface((self.cell_size, self.cell_size))
+                            range_surface.set_alpha(100)
+                            range_surface.fill(self.colors['area_attack_range'])
+                            self.screen.blit(range_surface, (cell_x, cell_y))
+                            
+                            # 範囲攻撃枠線
+                            range_rect = pygame.Rect(cell_x, cell_y, self.cell_size, self.cell_size)
+                            pygame.draw.rect(self.screen, (255, 165, 0), range_rect, 2)
 
     def cleanup(self) -> None:
         """リソースをクリーンアップ"""
