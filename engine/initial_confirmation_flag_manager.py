@@ -48,25 +48,30 @@ class InitialConfirmationFlagManager:
     
     def is_first_execution(self, stage_id: str, student_id: Optional[str] = None) -> bool:
         """指定ステージの初回実行判定
-        
+
         Args:
             stage_id: 判定対象のステージID
             student_id: 学生ID（オプション）
-        
+
         Returns:
             bool: True=初回実行, False=再実行
         """
         if not stage_id:
             raise ValueError("stage_idは必須です")
-        
+
+        # 生成されたステージの場合、確認モードを強制的に無効化
+        if stage_id.startswith("generated_"):
+            logger.debug(f"初回実行判定: {stage_id} - 生成ステージのため確認モード無効化")
+            return False  # 生成ステージは常に「再実行」として扱い確認モードを回避
+
         # ステージの説明表示履歴を確認
         stage_intro_displayed = self.hyperparameter_manager.data.stage_intro_displayed
-        
+
         # 当該ステージの表示履歴がない場合は初回実行
         if stage_id not in stage_intro_displayed:
             logger.debug(f"初回実行判定: {stage_id} - 初回実行")
             return True
-        
+
         # 表示履歴がある場合は再実行
         logger.debug(f"初回実行判定: {stage_id} - 再実行")
         return False

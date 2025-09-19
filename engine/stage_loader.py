@@ -210,7 +210,7 @@ class StageLoader:
             # behavior フィールドの検証（オプション）
             if "behavior" in enemy_data:
                 behavior = enemy_data["behavior"]
-                valid_behaviors = ["guard", "patrol", "passive", "stage11_special", "conditional"]
+                valid_behaviors = ["guard", "patrol", "passive", "static", "stage11_special", "conditional"]
                 if behavior not in valid_behaviors:
                     raise StageValidationError(f"enemies[{i}].behaviorは {valid_behaviors} のいずれかである必要があります: {behavior}")
             
@@ -242,7 +242,7 @@ class StageLoader:
             
             # タイプの検証
             item_type = item_data["type"]
-            valid_types = ["weapon", "armor", "key", "potion"]
+            valid_types = ["weapon", "armor", "key", "potion", "coin", "gem", "scroll"]
             if item_type not in valid_types:
                 raise StageValidationError(f"items[{i}].typeは {valid_types} のいずれかである必要があります: {item_type}")
     
@@ -408,7 +408,10 @@ class StageLoader:
         constraints = data.get("constraints", {})
         allowed_apis = constraints.get("allowed_apis", ["turn_left", "turn_right", "move"])
         max_turns = constraints.get("max_turns", 100)
-        
+
+        # 勝利条件の抽出
+        victory_conditions = data.get("victory_conditions", [])
+
         # Stageオブジェクトの作成
         return Stage(
             id=data["id"],
@@ -426,7 +429,8 @@ class StageLoader:
             forbidden_cells=forbidden_cells,
             goal_position=goal_position,
             allowed_apis=allowed_apis,
-            constraints=constraints
+            constraints=constraints,
+            victory_conditions=victory_conditions
         )
     
     def get_available_stages(self) -> List[str]:

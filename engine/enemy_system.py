@@ -120,7 +120,7 @@ class AdvancedEnemy(Enemy):
         distance_to_player = self.position.distance_to(player_position)
         
         # 視界内にプレイヤーがいるか確認
-        player_visible = self._can_see_player(player_position, board)
+        player_visible = self.can_see_player(player_position, board)
         
         if player_visible:
             self.last_seen_player = player_position
@@ -130,28 +130,23 @@ class AdvancedEnemy(Enemy):
         self._update_state_logic(distance_to_player, player_visible)
     
     def _update_state_logic(self, distance: float, player_visible: bool) -> None:
-        """状態遷移ロジック - v1.2.7 視界検出拡張"""
-        # v1.2.7 拡張: 新しいvision_range検出
-        player_in_vision = self.detect_player(self.last_seen_player) if self.last_seen_player else player_visible
-        
+        """状態遷移ロジック - 統一された視界システム"""
+        # シンプルに統一: player_visibleのみを使用（方向を考慮した視界判定）
+
         # 攻撃範囲内
         if distance <= self.ai_config.attack_range and player_visible:
             self.current_state = EnemyState.ATTACKING
             self.movement_mode = "chase"
-        
-        # 検出範囲内（従来のdetection_range または新しいvision_range）
-        elif (distance <= self.ai_config.detection_range and player_visible) or player_in_vision:
+
+        # 視界内にプレイヤーを検出
+        elif player_visible:
             if self.ai_config.behavior_pattern in [BehaviorPattern.GUARD, BehaviorPattern.HUNTER]:
                 self.current_state = EnemyState.CHASING
                 self.movement_mode = "chase"
             elif self.ai_config.behavior_pattern == BehaviorPattern.PATROL:
                 # 巡回敵の場合、プレイヤー検出時は追跡モードに切り替え
-                if player_in_vision:
-                    self.current_state = EnemyState.CHASING
-                    self.movement_mode = "chase"
-                else:
-                    self.current_state = EnemyState.PATROLLING
-                    self.movement_mode = "patrol"
+                self.current_state = EnemyState.CHASING
+                self.movement_mode = "chase"
             elif self.ai_config.behavior_pattern == BehaviorPattern.RETREAT and self.hp < self.max_hp * 0.3:
                 self.current_state = EnemyState.RETREATING
                 self.movement_mode = "retreat"
@@ -327,15 +322,6 @@ class AdvancedEnemy(Enemy):
         
         return {"type": "none", "direction": None, "target": None}
     
-    def _can_see_player(self, player_position: Position, board) -> bool:
-        """プレイヤーを視認できるか"""
-        distance = self.position.distance_to(player_position)
-        
-        if distance > self.ai_config.detection_range:
-            return False
-        
-        # 視線遮蔽判定（簡単な実装）
-        return self._has_line_of_sight(player_position, board)
     
     def _has_line_of_sight(self, target: Position, board) -> bool:
         """視線が通っているか確認"""
@@ -406,18 +392,35 @@ class AdvancedEnemy(Enemy):
     
     def execute_action(self, action: Dict[str, Any], board) -> bool:
         """行動実行"""
+        print(f"🔧 DEBUG execute_action: 敵[{self.position.x},{self.position.y}]{self.direction.value} アクション={action}")
+
         if action["type"] == "move" and action["direction"]:
             new_position = self.position.move(action["direction"])
             if board.is_passable(new_position):
+                old_pos = f"[{self.position.x},{self.position.y}]"
+                old_dir = self.direction.value
                 self.position = new_position
-                self.direction = action["direction"]
+                new_pos = f"[{self.position.x},{self.position.y}]"
+                # 🔧 移動時は方向変更を行わない（1ターン1アクション制限）
+                # self.direction = action["direction"]
+                print(f"🔧 DEBUG move実行: {old_pos}{old_dir} → {new_pos}{self.direction.value}")
                 return True
-        
+
+        elif action["type"] == "turn":
+            # 新しいアクションタイプ: 方向転換のみ
+            if action["direction"]:
+                old_dir = self.direction.value
+                self.direction = action["direction"]
+                print(f"🔧 DEBUG turn実行: [{self.position.x},{self.position.y}] {old_dir} → {self.direction.value}")
+                return True
+
         elif action["type"] == "attack":
             if action["direction"]:
+                old_dir = self.direction.value
                 self.direction = action["direction"]
+                print(f"🔧 DEBUG attack実行: [{self.position.x},{self.position.y}] {old_dir} → {self.direction.value}")
             return True
-        
+
         return False
     
     def take_damage(self, damage: int, damage_type: str = "physical") -> int:
@@ -476,9 +479,10 @@ class AdvancedEnemy(Enemy):
             self.current_patrol_index = (self.current_patrol_index + 1) % len(self.patrol_path)
     
     def detect_player(self, player_position: Position) -> bool:
-        """プレイヤー検出（vision_range内判定）"""
-        distance = abs(self.position.x - player_position.x) + abs(self.position.y - player_position.y)
-        return distance <= self.vision_range
+        """プレイヤー検出（get_vision_cellsと同じ方向視界ロジック）"""
+        # 基底クラスのget_vision_cellsロジックを使用
+        vision_cells = self.get_vision_cells(board=None)  # 壁判定なしの視界取得
+        return player_position in vision_cells
     
     def get_status_info(self) -> Dict[str, Any]:
         """状態情報取得"""

@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 HyperParameterManagerの単体テスト
 v1.2.4新機能: 初回確認モード関連フィールドのテストを含む

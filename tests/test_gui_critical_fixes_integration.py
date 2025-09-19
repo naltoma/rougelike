@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 🆕 v1.2.1: GUI Critical Fixes 統合テスト
 テスト対象: Step/Pause/Resetボタン機能、ExecutionController統合、全システム連携

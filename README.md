@@ -1,13 +1,13 @@
 # Python初学者向けローグライク演習フレームワーク
 
-[![Version](https://img.shields.io/badge/version-v1.2.8-blue.svg)](VERSION_HISTORY.md)
+[![Version](https://img.shields.io/badge/version-v1.2.9-blue.svg)](VERSION_HISTORY.md)
 [![Python](https://img.shields.io/badge/python-3.8+-green.svg)](https://python.org)
 [![Tests](https://img.shields.io/badge/tests-88.9%25-brightgreen.svg)](#🧪-テスト実行)
 [![Quality](https://img.shields.io/badge/quality-優良⭐-gold.svg)](#📈-品質メトリクス)
 
 Python初学者のための教育用ローグライクゲームフレームワークです。体験的なプログラミング学習を通じて、基礎的なプログラミングスキルを習得できます。
 
-> **🏆 v1.2.8 特殊条件付きステージ・最終ボス複合戦完成！** 大型敵システム（2x2/3x3/2x3）・怒りモード・交互パターン検出・Stage11-13追加・最高難易度戦略学習実現 - 詳細は [VERSION_HISTORY.md](VERSION_HISTORY.md) をご覧ください
+> **🎯 v1.2.9 ランダムステージ生成システム完成！** 5種類のステージタイプ（move/attack/pickup/patrol/special）完全対応・CLI/ライブラリ統合・A*解法探索・無限学習コンテンツ自動生成実現 - 詳細は [VERSION_HISTORY.md](VERSION_HISTORY.md) をご覧ください
 
 ## 🎯 特徴
 
@@ -22,6 +22,7 @@ Python初学者のための教育用ローグライクゲームフレームワ�
 - **👁️ 敵AI視覚システム**: 方向性視覚・壁遮蔽・警戒追跡で高度な戦略学習
 - **🤖 大型敵システム**: Stage11-13で2x2/3x3/2x3敵・怒りモード・条件付き撃破学習
 - **🏆 最終ボス複合戦**: 交互怒りパターン検出・総合戦略思考・最高難易度挑戦
+- **🎯 ランダムステージ生成**: 5種類のステージタイプ自動生成・A*解法探索・無限学習コンテンツ
 
 ### 📊 教師支援機能
 - **リアルタイム学習データ収集**: 学習者の行動を詳細記録
@@ -66,12 +67,18 @@ rougelike/
 │   ├── ultra_high_speed_controller.py # 超高速制御
 │   ├── speed_control_error_handler.py # 速度制御エラー処理
 │   └── enhanced_7stage_speed_errors.py # 速度制御例外
+├── src/                     # 🎯 ランダムステージ生成システム
+│   ├── stage_generator/     # ステージ生成ライブラリ
+│   ├── stage_validator/     # ステージ検証・解法探索
+│   └── yaml_manager/        # YAML管理ライブラリ
+├── scripts/                 # CLIツール
+│   ├── generate_stage.py    # 🎯 ランダムステージ生成CLI
+│   └── validate_stage.py    # 🎯 ステージ検証・解法探索CLI
 ├── stages/                  # ステージファイル
 ├── tests/                   # テストスイート
 ├── data/                    # データ保存
 ├── config/                  # 設定ファイル
-├── docs/                    # ドキュメント
-└── scripts/                 # ユーティリティ
+└── docs/                    # ドキュメント
 ```
 
 ## 🚀 クイックスタート
@@ -102,6 +109,36 @@ game.pickup()      # アイテム拾得
 if game.is_game_finished():
     result = game.get_game_result()
     print(f"ゲーム結果: {result}")
+```
+
+### 🎯 ランダムステージ生成 (v1.2.9 新機能)
+
+無限の学習コンテンツを自動生成できます：
+
+```bash
+# 基本移動ステージ生成（stage01-03相当）
+python scripts/generate_stage.py --type move --seed 123
+
+# 攻撃ステージ生成（stage04-06相当）
+python scripts/generate_stage.py --type attack --seed 456
+
+# 収集ステージ生成（stage07-09相当）
+python scripts/generate_stage.py --type pickup --seed 789
+
+# 巡回ステージ生成（stage10相当）
+python scripts/generate_stage.py --type patrol --seed 101
+
+# 特殊ステージ生成（stage11-13相当）
+python scripts/generate_stage.py --type special --seed 202
+
+# 生成と同時に検証
+python scripts/generate_stage.py --type attack --seed 456 --validate
+
+# 既存ステージの解法探索
+python scripts/validate_stage.py --file stages/stage01.yml --solution
+
+# 制限無し完全探索
+python scripts/validate_stage.py --file stages/stage01.yml --solution --max-nodes unlimited
 ```
 
 ### ⚡ 7段階速度制御機能 (v1.2.5)
@@ -366,11 +403,12 @@ Python初学者教育の向上を目指して開発されました。教育現�
 
 ## 📋 更新履歴
 
-最新バージョン: **v1.2.3** (2025年9月4日)
-- 🔗 Google Apps Script Webhook連携完了
-- 📊 無料・簡単セットアップ（教員5分・学生1分）
-- 🎯 ステージ別シート自動管理・上書き機能
-- 📝 7項目教育データ（完了フラグ・アクション数・コード行数等）
+最新バージョン: **v1.2.9** (2025年9月19日)
+- 🎯 ランダムステージ生成システム完成
+- 🚀 5種類のステージタイプ（move/attack/pickup/patrol/special）完全対応
+- 💻 CLI・ライブラリ・検証システム統合
+- 🧮 A*解法探索・制限無し探索モード実装
+- 📁 プロジェクト整理・テストシステム強化
 
 詳細な変更履歴は [VERSION_HISTORY.md](VERSION_HISTORY.md) をご覧ください。
 
@@ -378,8 +416,9 @@ Python初学者教育の向上を目指して開発されました。教育現�
 
 ## 備考
 
-AI-DLC（AI-Driven Development Life Cycle） と Spec-Driven Development（仕様駆動開発） のワークフローを設定した[cc-sdd / Claude Code Spec](https://github.com/gotalab/claude-code-spec)で作成しています。
+- 〜 v1.2.8までは、AI-DLC（AI-Driven Development Life Cycle） と Spec-Driven Development（仕様駆動開発） のワークフローを設定した[cc-sdd / Claude Code Spec](https://github.com/gotalab/claude-code-spec)で作成しました。
+- v1.2.9からは、[spec kit](https://github.com/github/spec-kit)で作成しています。
 
 ---
 
-**🎮 楽しく学び、効果的に指導する - Python教育の新しい形 v1.2.3**
+**🎮 楽しく学び、効果的に指導する - Python教育の新しい形 v1.2.9**

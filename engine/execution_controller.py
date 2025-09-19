@@ -82,7 +82,7 @@ class ExecutionController:
                             execution_time_ms=0.0,
                             actions_executed=0
                         )
-                
+
                 # 🔧 連続実行中はSTEPPINGに変更しない
                 if self.state.mode != ExecutionMode.CONTINUOUS:
                     # PAUSED状態からSTEPPINGに遷移する場合、古いフラグを必ずリセット
@@ -90,13 +90,14 @@ class ExecutionController:
                         self.single_step_requested = False
                         logger.debug("🔍 PAUSED→STEPPING遷移: 古いフラグリセット")
                     self.state.mode = ExecutionMode.STEPPING
-                
+
                 # ステップフラグをセット - solve()実行を1アクション分許可
                 self.single_step_requested = True
-                
-                # 新しいstep要求時は1アクション分許可
+
+                # 🔧 厳密に1アクションのみ許可（複数実行を防止）
                 self.current_step_actions_allowed = 1
-                
+                logger.info(f"🔍 Step実行: 1アクションのみ許可 (actions_allowed={self.current_step_actions_allowed})")
+
                 # step実行トークンをセット（1アクションのみ許可）
                 self.step_execution_token.set()
                 
@@ -230,13 +231,24 @@ class ExecutionController:
             else:
                 logger.info("🔍 停止要求をメインスレッドで検出 - 処理継続")
             return
-            
+
         current_mode = self.state.mode
-        
+
+        # 🔧 アクション数上限チェック（早期ブロック）
+        if current_mode == ExecutionMode.STEPPING and self.current_step_actions_allowed <= 0:
+            logger.info(f"🚫 wait_for_action: アクション数上限に達しているため強制的にPAUSEDに遷移")
+            with self._lock:
+                self.state.mode = ExecutionMode.PAUSED
+                self.single_step_requested = False
+                self.step_execution_token.clear()
+            # PAUSED状態での待機処理へ再帰的に移行
+            self.wait_for_action()
+            return
+
         # ログ出力でデバッグ
         import threading
         thread_name = threading.current_thread().name
-        logger.info(f"🔍 wait_for_action呼び出し: mode={current_mode}, step_req={self.single_step_requested}, pause_req={self.pause_requested}, thread={thread_name}")
+        logger.info(f"🔍 wait_for_action呼び出し: mode={current_mode}, step_req={self.single_step_requested}, pause_req={self.pause_requested}, thread={thread_name}, actions_allowed={self.current_step_actions_allowed}")
         
         if current_mode == ExecutionMode.STEPPING:
             # ステップモードではトークンベース制御
@@ -245,12 +257,15 @@ class ExecutionController:
                 with self._lock:
                     self.step_execution_token.clear()
                     self.current_step_actions_allowed -= 1
-                    # アクション数が0になったらPAUSEDに遷移（フラグはAPI完了後にクリア）
+                    logger.info(f"🔍 ステップモード: トークン使用→1APIコール許可 (actions_allowed={self.current_step_actions_allowed})")
+                    # アクション数が0になったら即座にPAUSEDに遷移
                     if self.current_step_actions_allowed <= 0:
                         self.state.mode = ExecutionMode.PAUSED
                         self.single_step_requested = False
-                        # is_step_execution_activeはAPI実行完了後にクリアする
-                logger.info(f"🔍 ステップモード: トークン使用→1APIコール許可 (actions_allowed={self.current_step_actions_allowed})")
+                        logger.info(f"🔍 ステップモード: アクション数上限に達しました → PAUSEDに遷移")
+
+                        # 🚫 execution_controllerでの敵ターン処理を無効化
+                        # API完了後に敵ターン処理を実行するよう変更
                 return  # APIコール実行を許可
             else:
                 # トークンがない場合は待機（solve()スレッドを継続）
@@ -272,7 +287,7 @@ class ExecutionController:
             self._handle_continuous_mode()
         elif current_mode == ExecutionMode.PAUSED:
             # PAUSED状態では長時間待機（solve()スレッドを継続）
-            logger.info(f"🔍 PAUSED状態: 実行再開待機中 (thread={thread_name})")
+            logger.info(f"🔍 PAUSED状態: 実行再開待機中 (thread={thread_name}, actions_allowed={self.current_step_actions_allowed})")
             while self.state.mode == ExecutionMode.PAUSED and not self.step_execution_token.is_set():
                 time.sleep(0.01)  # 10ms間隔でチェック（応答性向上）
                 # 停止要求チェック
@@ -281,11 +296,14 @@ class ExecutionController:
                     break
                 # モード変更チェック（Resume等）
                 if self.state.mode != ExecutionMode.PAUSED:
+                    logger.info(f"🔍 PAUSED状態: モード変更検出 {self.state.mode}")
                     break
                 # step実行トークンがセットされたらループを抜ける
                 if self.step_execution_token.is_set():
+                    logger.info(f"🔍 PAUSED状態: ステップトークン検出")
                     break
             # 待機後、再帰的にwait_for_action()を呼び出して再チェック
+            logger.info(f"🔍 PAUSED状態: 待機終了→再チェック")
             self.wait_for_action()
             return
         elif self.stop_requested.is_set():
@@ -299,7 +317,20 @@ class ExecutionController:
                     logger.debug("🔍 その他状態での停止要求検出")
                     break
                 time.sleep(0.001)
-    
+
+    def _trigger_delayed_enemy_turn_processing(self):
+        """ステップ完了時の遅延敵ターン処理"""
+        try:
+            # 🔧 ステップ完了時は常に敵ターン処理を実行（遅延処理の目的）
+            from .api import _global_api
+            if hasattr(_global_api, 'game_manager') and _global_api.game_manager:
+                logger.info(f"🔧 遅延敵ターン処理を実行")
+                _global_api.game_manager._process_enemy_turns()
+            else:
+                logger.warning("🔧 GameStateManagerが見つからないため敵ターン処理をスキップ")
+        except Exception as e:
+            logger.error(f"🔧 遅延敵ターン処理エラー: {e}")
+
     def _handle_stepping_mode(self) -> None:
         """ステップモード処理（ネストループ対応版）"""
         # single_step_requestedフラグがセットされている場合のみ実行を許可

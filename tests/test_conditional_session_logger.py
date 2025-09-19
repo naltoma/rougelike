@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 ConditionalSessionLoggerの単体テスト
 v1.2.4新機能: セッションログ条件制御システムのテスト

@@ -1,0 +1,474 @@
+# API Schema for Stage Generation System
+
+openapi: 3.0.3
+info:
+  title: Stage Generation System
+  description: Random stage generation and validation for Python roguelike framework
+  version: 1.2.9
+
+paths:
+  /generate:
+    post:
+      summary: Generate a random stage
+      description: |
+        Generate a random roguelike stage based on type and seed.
+        Returns the generated stage configuration.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerationRequest'
+      responses:
+        '200':
+          description: Stage generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerationResponse'
+        '400':
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Generation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /validate:
+    post:
+      summary: Validate stage solvability
+      description: |
+        Validate that a stage configuration is solvable using pathfinding.
+        Returns detailed validation results.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ValidationRequest'
+      responses:
+        '200':
+          description: Validation completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationResponse'
+        '400':
+          description: Invalid stage configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '408':
+          description: Validation timeout
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    GenerationRequest:
+      type: object
+      required:
+        - stage_type
+        - seed
+      properties:
+        stage_type:
+          type: string
+          enum: [move, attack, pickup, patrol, special]
+          description: Type of stage to generate
+        seed:
+          type: integer
+          minimum: 0
+          maximum: 4294967295
+          description: Random seed for reproducible generation
+        validate:
+          type: boolean
+          default: false
+          description: Whether to validate stage after generation
+
+    GenerationResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        stage_config:
+          $ref: '#/components/schemas/StageConfiguration'
+        validation_result:
+          $ref: '#/components/schemas/ValidationResult'
+        metadata:
+          type: object
+          properties:
+            generation_time_ms:
+              type: integer
+            suggested_filename:
+              type: string
+
+    ValidationRequest:
+      type: object
+      required:
+        - stage_config
+      properties:
+        stage_config:
+          $ref: '#/components/schemas/StageConfiguration'
+        timeout_seconds:
+          type: integer
+          default: 60
+          minimum: 1
+          maximum: 300
+        detailed:
+          type: boolean
+          default: false
+          description: Include detailed path analysis
+
+    ValidationResponse:
+      type: object
+      properties:
+        validation_result:
+          $ref: '#/components/schemas/ValidationResult'
+
+    StageConfiguration:
+      type: object
+      required:
+        - id
+        - title
+        - description
+        - board
+        - player
+        - goal
+        - enemies
+        - items
+        - constraints
+      properties:
+        id:
+          type: string
+          pattern: '^[a-zA-Z0-9_-]+$'
+        title:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        board:
+          $ref: '#/components/schemas/BoardConfiguration'
+        player:
+          $ref: '#/components/schemas/PlayerConfiguration'
+        goal:
+          $ref: '#/components/schemas/GoalConfiguration'
+        enemies:
+          type: array
+          items:
+            $ref: '#/components/schemas/EnemyConfiguration'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ItemConfiguration'
+        constraints:
+          $ref: '#/components/schemas/ConstraintConfiguration'
+        victory_conditions:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+                enum: [reach_goal, defeat_all_enemies, collect_all_items]
+        learning_objectives:
+          type: array
+          items:
+            type: string
+        hints:
+          type: array
+          items:
+            type: string
+        error_handling:
+          type: object
+          additionalProperties: true
+
+    BoardConfiguration:
+      type: object
+      required:
+        - size
+        - grid
+        - legend
+      properties:
+        size:
+          type: array
+          items:
+            type: integer
+            minimum: 5
+            maximum: 20
+          minItems: 2
+          maxItems: 2
+        grid:
+          type: array
+          items:
+            type: string
+          minItems: 5
+          maxItems: 20
+        legend:
+          type: object
+          additionalProperties:
+            type: string
+          required:
+            - "."
+            - "#"
+
+    PlayerConfiguration:
+      type: object
+      required:
+        - start
+        - direction
+      properties:
+        start:
+          type: array
+          items:
+            type: integer
+            minimum: 0
+          minItems: 2
+          maxItems: 2
+        direction:
+          type: string
+          enum: [N, S, E, W]
+        hp:
+          type: integer
+          minimum: 1
+          default: 100
+        max_hp:
+          type: integer
+          minimum: 1
+          default: 100
+        attack_power:
+          type: integer
+          minimum: 1
+          default: 30
+
+    GoalConfiguration:
+      type: object
+      required:
+        - position
+      properties:
+        position:
+          type: array
+          items:
+            type: integer
+            minimum: 0
+          minItems: 2
+          maxItems: 2
+
+    EnemyConfiguration:
+      type: object
+      required:
+        - id
+        - type
+        - position
+        - direction
+        - hp
+        - max_hp
+        - attack_power
+      properties:
+        id:
+          type: string
+          pattern: '^[a-zA-Z0-9_-]+$'
+        type:
+          type: string
+          enum: [normal, large_2x2, large_3x3, special_2x3]
+        position:
+          type: array
+          items:
+            type: integer
+            minimum: 0
+          minItems: 2
+          maxItems: 2
+        direction:
+          type: string
+          enum: [N, S, E, W]
+        hp:
+          type: integer
+          minimum: 1
+        max_hp:
+          type: integer
+          minimum: 1
+        attack_power:
+          type: integer
+          minimum: 1
+        behavior:
+          type: string
+          enum: [normal, patrol, guard, stage11_special, conditional]
+          default: normal
+        rage_threshold:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+        area_attack_range:
+          type: integer
+          minimum: 1
+          maximum: 5
+        stage11_special:
+          type: boolean
+        special_conditions:
+          type: object
+          additionalProperties: true
+
+    ItemConfiguration:
+      type: object
+      required:
+        - id
+        - type
+        - position
+      properties:
+        id:
+          type: string
+          pattern: '^[a-zA-Z0-9_-]+$'
+        type:
+          type: string
+          enum: [health_potion, weapon, armor, key, treasure]
+        position:
+          type: array
+          items:
+            type: integer
+            minimum: 0
+          minItems: 2
+          maxItems: 2
+        value:
+          type: integer
+          minimum: 1
+
+    ConstraintConfiguration:
+      type: object
+      required:
+        - max_turns
+        - allowed_apis
+      properties:
+        max_turns:
+          type: integer
+          minimum: 10
+          maximum: 2000
+        allowed_apis:
+          type: array
+          items:
+            type: string
+            enum: [turn_left, turn_right, move, attack, pickup, wait, see]
+          minItems: 1
+
+    ValidationResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        stage_path:
+          type: string
+        path_found:
+          type: boolean
+        required_apis:
+          type: array
+          items:
+            type: string
+        solution_length:
+          type: integer
+          minimum: 0
+        error_details:
+          type: string
+        detailed_analysis:
+          type: object
+          properties:
+            solution_path:
+              type: array
+              items:
+                type: string
+            player_positions:
+              type: array
+              items:
+                type: array
+                items:
+                  type: integer
+            combat_analysis:
+              type: object
+              properties:
+                enemies_defeated:
+                  type: integer
+                total_damage_dealt:
+                  type: integer
+                combat_efficiency:
+                  type: string
+            collection_analysis:
+              type: object
+              properties:
+                items_collected:
+                  type: integer
+                collection_order:
+                  type: array
+                  items:
+                    type: string
+            performance_metrics:
+              type: object
+              properties:
+                validation_time_ms:
+                  type: integer
+                nodes_explored:
+                  type: integer
+                efficiency_rating:
+                  type: string
+                  enum: [optimal, good, acceptable, poor]
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        details:
+          type: string
+        error_code:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+# Stage Type Specific Constraints
+# These are enforced by the generation logic, not the schema
+
+x-stage-type-constraints:
+  move:
+    board_size_range: [5, 8]
+    wall_density_range: [0.1, 0.25]
+    allowed_apis: [turn_left, turn_right, move, see]
+    enemy_count: 0
+    item_count: 0
+
+  attack:
+    board_size_range: [6, 10]
+    wall_density_range: [0.05, 0.20]
+    allowed_apis: [turn_left, turn_right, move, attack, see]
+    enemy_count_range: [1, 3]
+    enemy_hp_range: [10, 300]
+    item_count: 0
+
+  pickup:
+    board_size_range: [7, 12]
+    wall_density_range: [0.05, 0.15]
+    allowed_apis: [turn_left, turn_right, move, attack, pickup, see]
+    enemy_count_range: [0, 2]
+    item_count_range: [2, 5]
+
+  patrol:
+    board_size_range: [8, 14]
+    wall_density_range: [0.10, 0.20]
+    allowed_apis: [turn_left, turn_right, move, attack, pickup, wait, see]
+    enemy_count_range: [1, 3]
+    enemy_behavior: [patrol, guard]
+    item_count_range: [0, 2]
+
+  special:
+    board_size_range: [10, 15]
+    wall_density_range: [0.05, 0.15]
+    allowed_apis: [turn_left, turn_right, move, attack, pickup, wait, see]
+    enemy_count_range: [2, 5]
+    large_enemy_count_range: [1, 3]
+    special_conditions: true
+    item_count_range: [0, 3]

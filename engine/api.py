@@ -195,7 +195,8 @@ class APILayer:
                 player_hp=stage.player_hp,
                 player_max_hp=stage.player_max_hp,
                 player_attack_power=stage.player_attack_power,
-                stage_id=stage_id  # ⚠️ 重要: Stage11の特殊処理のためにstage_idを渡す
+                stage_id=stage_id,  # ⚠️ 重要: Stage11の特殊処理のためにstage_idを渡す
+                victory_conditions=stage.victory_conditions  # 勝利条件を渡す
             )
             
             # API制限設定

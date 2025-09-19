@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 🚀 v1.2.5: Session Logging Integration Test Suite
 7段階速度制御SessionLogger統合テストスイート

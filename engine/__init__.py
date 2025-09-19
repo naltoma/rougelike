@@ -59,6 +59,9 @@ class ItemType(Enum):
     ARMOR = "armor"           # 防具
     KEY = "key"              # 鍵
     POTION = "potion"        # ポーション
+    COIN = "coin"            # 金貨
+    GEM = "gem"              # 宝石
+    SCROLL = "scroll"        # 巻物
 
 class EnemyType(Enum):
     """敵の種類"""
@@ -160,13 +163,44 @@ class Character:
         """生存判定"""
         return self.hp > 0
     
-    def take_damage(self, damage):
+    def take_damage(self, damage, attacker_position=None):
         """ダメージを受ける。実際に受けたダメージ量を返す"""
         if damage < 0:
             return 0
         actual_damage = min(damage, self.hp)
         self.hp -= actual_damage
+
+        # 攻撃を受けた場合の反応処理
+        if actual_damage > 0 and attacker_position is not None:
+            self._react_to_attack(attacker_position)
+
         return actual_damage
+
+    def _react_to_attack(self, attacker_position):
+        """攻撃を受けた時の反応処理"""
+        # アラート状態にする
+        self.alerted = True
+
+        # 攻撃者の方向を段階的回転の目標として設定（即座に向かない）
+        if attacker_position and isinstance(self, Enemy):
+            dx = attacker_position.x - self.position.x
+            dy = attacker_position.y - self.position.y
+
+            # プレイヤーがどの方向にいるか判定して目標方向を設定
+            if abs(dx) > abs(dy):
+                # 水平方向の方が距離が大きい
+                if dx > 0:
+                    self.target_direction = Direction.EAST
+                else:
+                    self.target_direction = Direction.WEST
+            else:
+                # 垂直方向の方が距離が大きい
+                if dy > 0:
+                    self.target_direction = Direction.SOUTH
+                else:
+                    self.target_direction = Direction.NORTH
+
+            print(f"🎯 敵が攻撃を受けました: 現在方向 {self.direction.value} → 目標方向 {self.target_direction.value} (段階的回転開始)")
     
     def heal(self, amount):
         """回復する。実際に回復した量を返す"""
@@ -193,12 +227,19 @@ class Enemy(Character):
     enemy_mode: EnemyMode = EnemyMode.CALM
     rage_state: Optional['RageState'] = None
     conditional_behavior: Optional['ConditionalBehavior'] = None
+
+    # v1.2.9新機能: 段階的回転システム
+    target_direction: Optional[Direction] = None  # 段階的回転の目標方向
     
     def __post_init__(self):
         super().__post_init__()
         if self.patrol_path is None:
             self.patrol_path = []
-        
+
+        # 巡回パスが設定されている場合、現在位置に対応するインデックスを設定
+        if self.patrol_path:
+            self._initialize_patrol_index()
+
         # v1.2.8: 大型敵にRageState自動初期化
         if self.enemy_type in [EnemyType.LARGE_2X2, EnemyType.LARGE_3X3]:
             if self.rage_state is None:
@@ -237,6 +278,16 @@ class Enemy(Character):
         """プレイヤーを視野範囲内で視認できるかどうか（get_vision_cellsと完全に同じ基準を使用）"""
         vision_cells = self.get_vision_cells(board=board)
         result = player_position in vision_cells
+
+        # デバッグログ: 背後接敵問題調査用
+        if hasattr(self, 'id') and self.id == "guard_1":
+            print(f"🔍 [DEBUG] 敵{self.id} 視界判定:")
+            print(f"   敵位置: [{self.position.x},{self.position.y}] 向き: {self.direction.value}")
+            print(f"   プレイヤー位置: [{player_position.x},{player_position.y}]")
+            print(f"   vision_range: {self.vision_range}")
+            print(f"   視界セル: {[(cell.x, cell.y) for cell in vision_cells]}")
+            print(f"   検出結果: {result}")
+
         return result
     
     def get_vision_cells(self, board=None) -> List[Position]:
@@ -322,6 +373,29 @@ class Enemy(Character):
         if self.patrol_path:
             self.current_patrol_index = (self.current_patrol_index + 1) % len(self.patrol_path)
 
+    def _initialize_patrol_index(self) -> None:
+        """現在位置に基づいて正しい patrol_index を設定"""
+        if not self.patrol_path:
+            return
+
+        # 現在位置がpatrol_pathの中にあるかチェック
+        for i, patrol_pos in enumerate(self.patrol_path):
+            if (patrol_pos.x == self.position.x and patrol_pos.y == self.position.y):
+                self.current_patrol_index = i
+                return
+
+        # 現在位置がpatrol_pathにない場合、最も近い位置を見つける
+        min_distance = float('inf')
+        closest_index = 0
+
+        for i, patrol_pos in enumerate(self.patrol_path):
+            distance = abs(patrol_pos.x - self.position.x) + abs(patrol_pos.y - self.position.y)
+            if distance < min_distance:
+                min_distance = distance
+                closest_index = i
+
+        self.current_patrol_index = closest_index
+
 @dataclass
 class Item:
     """アイテム"""
@@ -381,6 +455,7 @@ class GameState:
     status: GameStatus = GameStatus.PLAYING
     goal_position: Optional[Position] = None
     stage_id: Optional[str] = None  # ステージ識別用
+    victory_conditions: Optional[List[Dict[str, str]]] = None  # 勝利条件リスト
     
     def __post_init__(self):
         """バリデーション"""
@@ -406,16 +481,38 @@ class GameState:
         return self.player.position == self.goal_position
     
     def check_victory_conditions(self):
-        """勝利条件チェック - v1.2.6攻撃システム統合"""
+        """勝利条件チェック - v1.2.6攻撃システム統合 + v1.2.9アイテム収集条件追加"""
         # ゴール位置に到達していない場合は勝利ではない
         if not self.check_goal_reached():
             return False
-        
-        # 敵が残っている場合は勝利ではない（stage04-06の要件）
-        alive_enemies = [enemy for enemy in self.enemies if enemy.is_alive()]
-        if alive_enemies:
-            return False
-        
+
+        # 勝利条件が指定されている場合は個別にチェック
+        if self.victory_conditions:
+            for condition in self.victory_conditions:
+                condition_type = condition.get('type')
+
+                if condition_type == 'collect_all_items':
+                    # 全てのアイテムが収集されているかチェック
+                    if len(self.items) > 0:  # まだ収集されていないアイテムがある
+                        return False
+
+                elif condition_type == 'defeat_all_enemies':
+                    # 全ての敵が倒されているかチェック
+                    alive_enemies = [enemy for enemy in self.enemies if enemy.is_alive()]
+                    if alive_enemies:
+                        return False
+
+                elif condition_type == 'reach_goal':
+                    # ゴール到達は既に上でチェック済み
+                    pass
+
+        else:
+            # 勝利条件が未指定の場合は従来の動作（後方互換性）
+            # 敵が残っている場合は勝利ではない（stage04-06の要件）
+            alive_enemies = [enemy for enemy in self.enemies if enemy.is_alive()]
+            if alive_enemies:
+                return False
+
         return True
     
     def get_item_at(self, pos):
@@ -451,6 +548,7 @@ class Stage:
     player_hp: Optional[int] = None  # ステージ固有のプレイヤーHP（Noneの場合はデフォルト値を使用）
     player_max_hp: Optional[int] = None  # ステージ固有の最大HP
     player_attack_power: Optional[int] = None  # ステージ固有の攻撃力
+    victory_conditions: Optional[List[Dict[str, str]]] = None  # 勝利条件リスト
     
     def __post_init__(self):
         """バリデーション"""

@@ -37,6 +37,7 @@ enemies:
     position: [6, 2]
     direction: "E"
     hp: 45
+    max_hp: 100
     attack_power: 28
     behavior: "patrol"
     vision_range: 2

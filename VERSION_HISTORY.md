@@ -2,6 +2,84 @@
 
 Python初学者向けローグライク演習フレームワークのリリース履歴
 
+## v1.2.9 - 2025年9月19日 🎯
+
+### 🚀 ランダムステージ生成システム - 完全機能版の実現
+
+ランダムステージ生成システムの完全実装により、無限の学習コンテンツ自動生成を実現。5種類のステージタイプに対応し、CLI・ライブラリ・検証システムが統合された本番運用可能なシステムが完成しました。
+
+#### 🏗️ 完全なステージ生成システム
+- **5種類のステージタイプ**完全対応（move, attack, pickup, patrol, special）
+- **再現可能生成**: 同一seed + typeで完全同一ステージ保証
+- **自動妥当性検証**: 生成された全ステージの攻略可能性を自動検証
+- **既存YAML形式準拠**: 新属性追加なしでの完全互換性
+
+#### 💻 CLI実行環境
+- **scripts/generate_stage.py**: シード指定ランダム生成CLI
+- **scripts/validate_stage.py**: ステージ検証・解法探索CLI
+- **A*解法探索**: `--solution`オプションで自動解法発見
+- **制限無し探索**: `--max-nodes unlimited`で完全探索モード
+
+#### 🧮 コアライブラリ実装
+- **src/stage_generator/**: 型安全なステージ生成ライブラリ
+  - `data_models.py`: StageType、GenerationParameters等のデータモデル
+  - `types/`: 5種類の専用ジェネレータ（move/attack/pickup/patrol/special）
+- **src/stage_validator/**: 包括的検証システム
+  - `validator.py`: ステージ妥当性検証エンジン
+  - `pathfinding.py`: A*パスファインディング実装（深さ優先探索との違いを明確化）
+  - `validation_models.py`: 検証結果データモデル
+
+#### 🔬 包括的テストシステム
+- **tests/contract/**: CLI/API契約テスト
+- **tests/integration/**: ステージタイプ別統合テスト
+- **tests/debug/**: デバッグ用テストスイート
+- **TDD原則**: 全機能にテスト先行開発を適用
+
+#### 📁 プロジェクト整理完了
+- **ファイル整理**: トップディレクトリのdebug_*.py, test_*.pyファイルを整理
+- **tests/移行**: 価値あるテストファイルをtests/ディレクトリに移動
+- **実行環境統一**: 全ファイルをPython実行可能形式に統一
+
+#### ⚡ パフォーマンス仕様
+- **生成速度**: <1秒（標準的なステージ）
+- **検証速度**: <5秒（複雑なパスファインディング含む）
+- **A*解法発見**: 自動最適解探索システム
+
+#### 🎯 教育的価値
+- **無限学習コンテンツ**: シード値変更で異なる問題を無限生成
+- **段階的難易度**: 5つのステージタイプによる体系的スキル習得
+- **自動検証**: 教員による事前チェック不要の信頼性保証
+- **アルゴリズム学習**: A*実装解説書による探索アルゴリズムの深い理解
+
+#### 📊 使用例
+```bash
+# 基本移動ステージ生成
+python scripts/generate_stage.py --type move --seed 123
+
+# 攻撃ステージ生成＋検証
+python scripts/generate_stage.py --type attack --seed 456 --validate
+
+# 既存ステージの解法探索
+python scripts/validate_stage.py --file stages/stage01.yml --solution
+
+# 制限無し完全探索
+python scripts/validate_stage.py --file stages/stage01.yml --solution --max-nodes unlimited
+```
+
+#### 🏆 技術的達成
+- **モジュラー設計**: ステージタイプ別の独立ジェネレータ
+- **型安全性**: 包括的なデータモデルとバリデーション
+- **完全自動化**: 生成から検証まで人的介入不要
+- **本番運用対応**: エラーハンドリング・ログ・設定管理完備
+
+#### 📁 ファイル構成変更
+- **新規追加**: `src/stage_generator/`, `src/stage_validator/`, `scripts/generate_stage.py`, `scripts/validate_stage.py`
+- **整理完了**: トップディレクトリのデバッグファイル群をtests/に移動
+- **ドキュメント**: `docs/v1.2.9.md`完全版レポート、`docs/A_star_implementation.md`A*アルゴリズム解説書
+
+#### 💡 v1.2.9の意義
+v1.2.9により、Python初学者向けローグライク演習フレームワークは**学習コンテンツ自動生成機能**を獲得しました。教員は手動でステージを作成する必要がなくなり、学習者は無限の練習問題で技能を向上させることが可能になりました。
+
 ## v1.2.8 - 2025年9月13日 🏆
 
 ### 🌟 特殊条件付きステージ実装 - 最終ボス複合戦システムの完成

@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Google Sheets統合機能テストスイート
 Integration Test Suite for Google Sheets Integration v1.2.3

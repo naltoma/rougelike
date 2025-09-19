@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 🚀 v1.2.5: Error Handling Integration Test Suite
 7段階速度制御エラーハンドリング統合テストスイート

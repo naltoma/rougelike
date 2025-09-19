@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 WaitCommandの単体テスト
 """

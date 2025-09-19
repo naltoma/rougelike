@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 StageDescriptionRendererの単体テスト
 v1.2.4新機能: ステージ説明表示システムのテスト

@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Google認証ライブラリセットアップテスト
 Modern Google Auth library import validation

@@ -33,22 +33,24 @@ goal:
   position: [0, 9]
 
 enemies:
-  - position: [9, 0]    # 右上
+  - id: "enemy1"
+    position: [9, 0]    # 右上
     type: "normal"
     direction: "S"       # 南向き（プレイヤーが来ない方向）
     hp: 100
     max_hp: 100
     attack_power: 5
-    behavior_pattern: "static"
-    is_angry: false
-  - position: [9, 9]    # 右下
+    vision_range: 2
+    behavior: "static"
+  - id: "enemy2"
+    position: [9, 9]    # 右下
     type: "normal"
     direction: "W"       # 西向き（プレイヤーが来ない方向）
     hp: 100
     max_hp: 100
     attack_power: 5
-    behavior_pattern: "static"
-    is_angry: false
+    vision_range: 2
+    behavior: "static"
 
 items: []
 

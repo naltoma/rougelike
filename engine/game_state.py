@@ -19,7 +19,7 @@ class GameStateManager:
         # v1.2.8: 2x3敵用交互怒りモード履歴管理
         self.rage_mode_history: List[Dict[str, Any]] = []
     
-    def initialize_game(self, 
+    def initialize_game(self,
                        player_start: Position,
                        player_direction: Direction,
                        board: Board,
@@ -31,7 +31,8 @@ class GameStateManager:
                        player_max_hp: Optional[int] = None,
                        player_attack_power: Optional[int] = None,
                        stage_id: Optional[str] = None,
-                       error_config: Optional[Dict[str, Any]] = None) -> GameState:
+                       error_config: Optional[Dict[str, Any]] = None,
+                       victory_conditions: Optional[List[Dict[str, str]]] = None) -> GameState:
         """ゲームを初期化"""
         if enemies is None:
             enemies = []
@@ -62,7 +63,8 @@ class GameStateManager:
             max_turns=max_turns,
             status=GameStatus.PLAYING,
             goal_position=goal_position,
-            stage_id=stage_id  # ステージIDを設定
+            stage_id=stage_id,  # ステージIDを設定
+            victory_conditions=victory_conditions  # 勝利条件を設定
         )
         
         # 特殊ステージエラーハンドラーの初期化
@@ -127,12 +129,22 @@ class GameStateManager:
         """ゲーム状態を更新（ターン増加、勝利判定など）"""
         if self.current_state is None:
             return
-        
+
         # ターン数増加
         self.current_state.increment_turn()
-        
-        # 敵のターン処理を実行
-        self._process_enemy_turns()
+
+        # 🔧 ステップ実行モード時の敵ターン処理制御
+        should_skip_enemy_turn = self._should_skip_enemy_turn_processing()
+
+        print(f"🔧 敵ターン処理判定: should_skip={should_skip_enemy_turn}")
+
+        if should_skip_enemy_turn:
+            # ステップ実行中は敵ターン処理をスキップ
+            print(f"🚫 敵ターン処理をスキップ（ステップ実行モード）")
+        else:
+            # 敵のターン処理を実行
+            print(f"✅ 敵ターン処理を実行（通常モード）")
+            self._process_enemy_turns()
         
         # プレイヤー死亡判定
         if not self.current_state.player.is_alive():
@@ -157,7 +169,34 @@ class GameStateManager:
             self.current_state.goal_position is None and 
             self.current_state.turn_count > 0):
             self.current_state.status = GameStatus.WON
-    
+
+    def _should_skip_enemy_turn_processing(self) -> bool:
+        """ステップ実行モード時の敵ターン処理スキップ判定"""
+        try:
+            # ExecutionControllerへの参照を取得
+            from .api import _global_api
+
+            if not hasattr(_global_api, 'execution_controller') or not _global_api.execution_controller:
+                print(f"🔍 敵ターンスキップ判定: ExecutionController不存在 → False")
+                return False
+
+            execution_controller = _global_api.execution_controller
+
+            # ステップ実行アクティブフラグをチェック
+            is_step_active = getattr(execution_controller, 'is_step_execution_active', False)
+            current_mode = getattr(execution_controller.state, 'mode', 'UNKNOWN')
+
+            print(f"🔍 敵ターンスキップ判定: is_step_active={is_step_active}, mode={current_mode}")
+
+            # 🔧 ステップ実行でも敵ターン処理を実行（正しいターン制のため）
+            # プレイヤーアクション完了後に敵ターンが実行される
+            return False  # 敵ターン処理を常に実行
+
+        except Exception as e:
+            # エラー時は通常処理を続行
+            print(f"🔍 敵ターンスキップ判定エラー: {e} → False")
+            return False
+
     def _process_enemy_turns(self):
         """敵のターン処理"""
         if self.current_state is None:
@@ -168,29 +207,53 @@ class GameStateManager:
         # デバッグ: stage_idを確認
         print(f"🔧 _process_enemy_turns開始: stage_id={getattr(self.current_state, 'stage_id', 'None')}")
         
-        # 各敵のAI行動を実行
+        # このターンで既に行動した敵を追跡するセット
+        enemies_already_moved = set()
+
+        # 第1段階: 先に敵の移動処理を実行
         for enemy in self.current_state.enemies:
             if not enemy.is_alive():
                 continue
-            
+
             # Stage11/Stage12特別処理: stage11_special属性ベースでの判定
             if (hasattr(enemy, 'stage11_special') and enemy.stage11_special):
                 # stage11_special=trueの敵は特殊行動パターン
                 print(f"🔧 特殊敵処理開始: HP={enemy.hp}/{enemy.max_hp}")
                 self._handle_stage11_enemy_behavior(enemy, player)
+                enemies_already_moved.add(id(enemy))  # 既に行動済みとしてマーク
                 continue
-            
+
             # v1.2.8: 2x3敵特殊処理
             if (hasattr(enemy, 'enemy_type') and enemy.enemy_type.value == "special_2x3"):
                 print(f"🔧 2x3特殊敵処理開始: HP={enemy.hp}/{enemy.max_hp}")
                 self._handle_special_2x3_behavior(enemy, player)
+                enemies_already_moved.add(id(enemy))  # 既に行動済みとしてマーク
                 continue
-            
+
+            # 移動処理を先に実行（非警戒状態の場合のみ）
+            if not enemy.alerted:
+                self._execute_enemy_movement(enemy, player)
+                enemies_already_moved.add(id(enemy))  # 既に行動済みとしてマーク
+
+        # 第2段階: 移動後の位置で視界判定と警戒状態更新
+        for enemy in self.current_state.enemies:
+            if not enemy.is_alive():
+                continue
+
+            # 特殊敵はスキップ
+            if (hasattr(enemy, 'stage11_special') and enemy.stage11_special):
+                continue
+            if (hasattr(enemy, 'enemy_type') and enemy.enemy_type.value == "special_2x3"):
+                continue
+
             # プレイヤーを視認できるかチェック（壁による視線遮蔽を考慮）
             can_see = enemy.can_see_player(player.position, self.current_state.board)
-            
+
+            # デバッグ: 視界判定の詳細ログ
+            print(f"🔍 DEBUG enemy_turn - 敵{enemy.position}→プレイヤー{player.position}: can_see={can_see}, alerted={enemy.alerted}")
+
             # 重要な状態変化のみログ出力
-            
+
             # プレイヤーを発見した場合は警戒状態にする
             if can_see:
                 if not enemy.alerted:
@@ -206,190 +269,192 @@ class GameStateManager:
                 if enemy.alert_cooldown <= 0:
                     enemy.alerted = False
                     print(f"😴 警戒解除: 巡回モードに復帰")
+
+        # 第3段階: 警戒状態の敵の追跡・攻撃処理
+        for enemy in self.current_state.enemies:
+            if not enemy.is_alive():
+                continue
+
+            # 特殊敵はスキップ
+            if (hasattr(enemy, 'stage11_special') and enemy.stage11_special):
+                continue
+            if (hasattr(enemy, 'enemy_type') and enemy.enemy_type.value == "special_2x3"):
+                continue
+
+            # 🔧 既に行動済みの敵はスキップ（1ターン1アクション制御）
+            if id(enemy) in enemies_already_moved:
+                print(f"🔧 既に行動済みの敵をスキップ: 敵{enemy.position}")
+                continue
+
+            # 🔧 警戒状態の敵処理
+            if enemy.alerted:
+                print(f"🔧 警戒状態敵処理開始: 敵[{enemy.position.x},{enemy.position.y}] プレイヤー[{player.position.x},{player.position.y}]")
+                print(f"🔍 敵オブジェクト情報: type={type(enemy).__name__}")
+
+                # すべての敵に対して統一的な追跡行動を実行
+                # AdvancedEnemyシステムは複雑すぎるため、シンプルな追跡システムを使用
+                print(f"🔧 統一追跡システム使用: _simple_chase_behavior")
+                self._simple_chase_behavior(enemy, player.position)
             
-            # 警戒状態または隣接時のみ積極的行動
-            distance = abs(player.position.x - enemy.position.x) + abs(player.position.y - enemy.position.y)
-            if enemy.alerted or distance == 1:
-                print(f"⚔️ 敵が積極的行動開始: 警戒={enemy.alerted} 距離={distance}")
-                # 敵とプレイヤーの位置関係を計算
-                dx = player.position.x - enemy.position.x
-                dy = player.position.y - enemy.position.y
-                distance = abs(dx) + abs(dy)  # マンハッタン距離
-                
-                # 隣接している場合（距離1）の処理
-                if distance == 1:
-                    print(f"⚔️ 隣接判定: 敵[{enemy.position.x},{enemy.position.y}] → プレイヤー[{player.position.x},{player.position.y}]")
-                    
-                    # 攻撃に必要な方向を計算
-                    if abs(dx) > abs(dy):
-                        required_direction = Direction.EAST if dx > 0 else Direction.WEST
-                    else:
-                        required_direction = Direction.SOUTH if dy > 0 else Direction.NORTH
-                    
-                    # 既に正しい方向を向いている場合のみ攻撃実行
-                    if enemy.direction == required_direction:
-                        # プレイヤーを攻撃
-                        damage = enemy.attack_power
-                        actual_damage = player.take_damage(damage)
-                        print(f"💀 敵の攻撃！ {actual_damage}ダメージ (プレイヤーHP: {player.hp}/{player.max_hp})")
-                        
-                        if not player.is_alive():
-                            print(f"☠️ プレイヤー死亡！")
-                            self.current_state.status = GameStatus.FAILED
-                    else:
-                        # 正しい方向を向いていない場合は方向転換のみ（1ターン消費）
-                        print(f"🔄 攻撃前方向転換: {enemy.direction.value} → {required_direction.value}")
-                        enemy.direction = required_direction
-                
-                # 隣接していない場合は1マス近づく移動を試みる（警戒状態のみ）
-                elif distance > 1 and enemy.alerted:
-                    # 追跡目標を決定（現在のプレイヤー位置 or 最後に見た位置）
-                    target_position = player.position if can_see else enemy.last_seen_player
-                    if target_position is None:
-                        target_position = player.position  # フォールバック
-                    
-                    # 最後に見た位置に到達しているが、プレイヤーが見つからない場合の探索強化
-                    if (not can_see and enemy.last_seen_player is not None and 
-                        enemy.position == enemy.last_seen_player):
-                        print(f"🔍 最後の目撃地点に到達: 周辺探索モードに移行")
-                        # プレイヤーの現在位置を新たな目標として更新（推測に基づく）
-                        target_position = player.position
-                    
-                    target_dx = target_position.x - enemy.position.x
-                    target_dy = target_position.y - enemy.position.y
-                    target_distance = abs(target_dx) + abs(target_dy)
-                    
-                    print(f"🏃 追跡開始: 敵[{enemy.position.x},{enemy.position.y}] → 目標[{target_position.x},{target_position.y}] 距離={target_distance} ({'直視' if can_see else '記憶'})")
-                    # 目標位置に最も近づく方向を決定（接触維持を優先した改良版）
-                    required_direction = None
-                    if abs(target_dx) > abs(target_dy):
-                        required_direction = Direction.EAST if target_dx > 0 else Direction.WEST
-                        print(f"🏃 x軸優先追跡: target_dx={target_dx}, 選択方向={required_direction.value}")
-                    elif abs(target_dy) > abs(target_dx):
-                        required_direction = Direction.SOUTH if target_dy > 0 else Direction.NORTH
-                        print(f"🏃 y軸優先追跡: target_dy={target_dy}, 選択方向={required_direction.value}")
-                    else:
-                        # 同一距離の場合は接触維持を重視してx軸を優先
-                        required_direction = Direction.EAST if target_dx > 0 else Direction.WEST
-                        print(f"🏃 同一距離追跡（接触重視x軸優先）: target_dx={target_dx}, target_dy={target_dy}, 選択方向={required_direction.value}")
-                    
-                    # 既に正しい方向を向いているかチェック
-                    if enemy.direction != required_direction:
-                        # 方向転換のみ（1ターン消費）
-                        print(f"🔄 追跡方向転換: {enemy.direction.value} → {required_direction.value}")
-                        enemy.direction = required_direction
-                    else:
-                        # 正しい方向を向いているので移動実行
-                        offset_x, offset_y = required_direction.get_offset()
-                        new_position = Position(enemy.position.x + offset_x, enemy.position.y + offset_y)
-                        
-                        print(f"🏃 追跡移動試行: [{enemy.position.x},{enemy.position.y}] → [{new_position.x},{new_position.y}]")
-                        
-                        # 移動先が有効で通行可能な場合のみ移動
-                        if (self.current_state.board.is_passable(new_position) and 
-                            self.current_state.get_enemy_at(new_position) is None and
-                            new_position != player.position):
-                            
-                            print(f"✅ 追跡移動成功: [{enemy.position.x},{enemy.position.y}] → [{new_position.x},{new_position.y}]")
-                            enemy.position = new_position
-                        else:
-                            print(f"❌ 追跡移動失敗: 通行不可 または 他の敵 または プレイヤー位置")
-                            # 壁に詰まった場合、代替ルートを試す
-                            print(f"🔄 代替ルート検索中...")
-                            alternative_directions = []
-                            if required_direction in [Direction.EAST, Direction.WEST]:
-                                # x軸移動が失敗した場合、y軸を試す
-                                if target_dy > 0:
-                                    alternative_directions.append(Direction.SOUTH)
-                                elif target_dy < 0:
-                                    alternative_directions.append(Direction.NORTH)
-                            elif required_direction in [Direction.NORTH, Direction.SOUTH]:
-                                # y軸移動が失敗した場合、x軸を試す
-                                if target_dx > 0:
-                                    alternative_directions.append(Direction.EAST)
-                                elif target_dx < 0:
-                                    alternative_directions.append(Direction.WEST)
-                            
-                            # 代替方向がない場合は全方向を試す（デッドロック回避）
-                            if not alternative_directions:
-                                print("🔄 全方向探索モードに切り替え")
-                                all_directions = [Direction.EAST, Direction.WEST, Direction.NORTH, Direction.SOUTH]
-                                for dir_candidate in all_directions:
-                                    if dir_candidate != required_direction:
-                                        alternative_directions.append(dir_candidate)
-                            
-                            # 代替方向を試行
-                            for alt_direction in alternative_directions:
-                                alt_offset_x, alt_offset_y = alt_direction.get_offset()
-                                alt_position = Position(enemy.position.x + alt_offset_x, enemy.position.y + alt_offset_y)
-                                
-                                if (self.current_state.board.is_passable(alt_position) and 
-                                    self.current_state.get_enemy_at(alt_position) is None and
-                                    alt_position != player.position):
-                                    
-                                    print(f"✅ 代替ルート成功: [{enemy.position.x},{enemy.position.y}] → [{alt_position.x},{alt_position.y}] (方向:{alt_direction.value})")
-                                    if enemy.direction != alt_direction:
-                                        print(f"🔄 代替方向転換: {enemy.direction.value} → {alt_direction.value}")
-                                        enemy.direction = alt_direction
-                                    else:
-                                        enemy.position = alt_position
-                                    break
-                            else:
-                                print(f"❌ 全ての代替ルートが失敗")
-            
-            # 非警戒状態では基本行動パターンを実行
+            # 非警戒状態では基本行動パターンを実行 - _execute_enemy_movementで処理済み
             elif not enemy.alerted:
-                print(f"🌀 敵は非警戒状態: 巡回モード")
-                # patrol: 巡回処理
-                if enemy.behavior_pattern == "patrol" and enemy.patrol_path:
-                    current_target = enemy.get_next_patrol_position()
-                    if current_target:
-                        # 目標位置に到達したかチェック
-                        if enemy.position == current_target:
-                            # 目標到達（デバッグログ削除）
-                            # 次のパトロールポイントに進む
-                            enemy.advance_patrol()
-                            current_target = enemy.get_next_patrol_position()
-                            # 新しい目標設定（デバッグログ削除）
-                        
-                        if current_target and current_target != enemy.position:
-                            # デバッグログ：敵の現在位置と目標位置
-                            # 敵巡回処理（デバッグログ削除）
-                            
-                            # 目標に向かう方向を計算
-                            dx = current_target.x - enemy.position.x
-                            dy = current_target.y - enemy.position.y
-                            
-                            # 巡回パスに従って正確に移動するため、x軸優先で移動
-                            # まずx方向の差を解消してからy方向に移動
-                            if dx != 0:
-                                required_direction = Direction.EAST if dx > 0 else Direction.WEST
-                                # x軸移動（デバッグログ削除）
-                            elif dy != 0:
-                                required_direction = Direction.SOUTH if dy > 0 else Direction.NORTH
-                                # y軸移動（デバッグログ削除）
-                            else:
-                                # 既に目標位置にいる場合（通常は発生しない）
-                                required_direction = enemy.direction
-                                # 目標位置到達（デバッグログ削除）
-                            
-                            # 既に正しい方向を向いているかチェック
-                            if enemy.direction != required_direction:
-                                # 方向転換のみ（1ターン消費）
-                                enemy.direction = required_direction
-                            else:
-                                # 正しい方向を向いているので移動実行
-                                offset_x, offset_y = required_direction.get_offset()
-                                new_position = Position(enemy.position.x + offset_x, enemy.position.y + offset_y)
-                                
-                                # 移動可能性をチェック
-                                if (self.current_state.board.is_passable(new_position) and 
-                                    self.current_state.get_enemy_at(new_position) is None and
-                                    new_position != player.position):
-                                    
-                                    enemy.position = new_position
-                # static: その場で待機（何もしない）
-    
+                # Stage 1で _execute_enemy_movement により移動処理完了済み
+                pass
+
+    def _simple_chase_behavior(self, enemy, player_pos):
+        """基本敵オブジェクト用の知能的追跡行動"""
+        try:
+            current_pos = enemy.position
+
+            # プレイヤーとの距離を計算
+            dx = player_pos.x - current_pos.x
+            dy = player_pos.y - current_pos.y
+            distance = abs(dx) + abs(dy)
+
+            print(f"🔧 知能追跡開始: 敵[{current_pos.x},{current_pos.y}] → プレイヤー[{player_pos.x},{player_pos.y}] 距離={distance}")
+            print(f"🔍 敵状態: direction={enemy.direction.value}, alerted={enemy.alerted}")
+
+            # 隣接している場合は攻撃
+            if distance == 1:
+                print(f"🎯 攻撃範囲内: 攻撃処理開始")
+        except Exception as e:
+            print(f"❌ _simple_chase_behavior 初期化エラー: {e}")
+            import traceback
+            traceback.print_exc()
+            return
+
+        try:
+            if distance == 1:
+                # プレイヤーの方向を向いて攻撃
+                required_direction = None
+                if abs(dx) > abs(dy):
+                    required_direction = Direction.EAST if dx > 0 else Direction.WEST
+                else:
+                    required_direction = Direction.SOUTH if dy > 0 else Direction.NORTH
+
+                print(f"🎯 攻撃処理: current_dir={enemy.direction.value}, required_dir={required_direction.value}")
+
+                if enemy.direction == required_direction:
+                    # 攻撃実行
+                    damage = enemy.attack_power
+                    player = self.current_state.player
+                    actual_damage = player.take_damage(damage)
+                    print(f"💀 敵の攻撃！ {actual_damage}ダメージ (プレイヤーHP: {player.hp}/{player.max_hp})")
+
+                    if not player.is_alive():
+                        print(f"☠️ プレイヤー死亡！")
+                        self.current_state.status = GameStatus.FAILED
+                else:
+                    # 方向転換
+                    enemy.direction = required_direction
+                    print(f"🔄 攻撃準備: 方向転換 → {required_direction.value}")
+                print(f"✅ 攻撃処理完了")
+                return
+        except Exception as e:
+            print(f"❌ 攻撃処理エラー: {e}")
+            import traceback
+            traceback.print_exc()
+            return
+
+        try:
+            # 移動処理
+            print(f"🚶 移動処理開始: 距離={distance}")
+
+            # プレイヤーに向かう最適方向を決定（大きな差分を優先）
+            target_directions = []
+
+            # X軸の移動
+            if dx > 0:
+                target_directions.append(Direction.EAST)
+            elif dx < 0:
+                target_directions.append(Direction.WEST)
+
+            # Y軸の移動
+            if dy > 0:
+                target_directions.append(Direction.SOUTH)
+            elif dy < 0:
+                target_directions.append(Direction.NORTH)
+
+            print(f"🎯 移動候補: {[d.value for d in target_directions]}")
+
+            # より大きな軸差分を優先（効率的な追跡）
+            if abs(dx) >= abs(dy):
+                pass  # X軸が既に最初
+            else:
+                # Y軸を優先するため順序入れ替え
+                if len(target_directions) == 2:
+                    target_directions[0], target_directions[1] = target_directions[1], target_directions[0]
+
+            # 優先順位で移動試行
+            for direction in target_directions:
+                new_pos = self._get_new_position(current_pos, direction)
+                print(f"🔍 移動試行: {direction.value} → [{new_pos.x},{new_pos.y}]")
+
+                # 有効な移動かチェック
+                if self._is_valid_move(new_pos, enemy):
+                    if direction == enemy.direction:
+                        # 同じ方向なら即座に移動
+                        enemy.position = new_pos
+                        print(f"🏃 知能追跡: 移動 [{current_pos.x},{current_pos.y}] → [{new_pos.x},{new_pos.y}]")
+                    else:
+                        # 方向転換
+                        enemy.direction = direction
+                        print(f"🔄 知能追跡: 方向転換 → {direction.value}")
+                    print(f"✅ 移動処理完了")
+                    return
+                else:
+                    print(f"❌ 移動不可: {direction.value}")
+
+            # 優先方向で移動できない場合は代替方向を試行
+            print(f"🔄 代替移動試行")
+            all_directions = [Direction.NORTH, Direction.SOUTH, Direction.EAST, Direction.WEST]
+            for direction in all_directions:
+                if direction in target_directions:
+                    continue  # 既に試行済み
+
+                new_pos = self._get_new_position(current_pos, direction)
+                if self._is_valid_move(new_pos, enemy):
+                    # 現在距離と比較して悪化させない移動のみ許可
+                    current_distance = abs(current_pos.x - player_pos.x) + abs(current_pos.y - player_pos.y)
+                    new_distance = abs(new_pos.x - player_pos.x) + abs(new_pos.y - player_pos.y)
+
+                    if new_distance <= current_distance:
+                        if direction == enemy.direction:
+                            enemy.position = new_pos
+                            print(f"🏃 知能追跡: 代替移動 [{current_pos.x},{current_pos.y}] → [{new_pos.x},{new_pos.y}]")
+                        else:
+                            enemy.direction = direction
+                            print(f"🔄 知能追跡: 代替方向転換 → {direction.value}")
+                        print(f"✅ 代替移動処理完了")
+                        return
+
+            print(f"🚫 知能追跡: 全方向移動不可")
+
+        except Exception as e:
+            print(f"❌ 移動処理エラー: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def _get_new_position(self, current_pos, direction):
+        """指定方向への新しい位置を取得"""
+        if direction == Direction.NORTH:
+            return Position(current_pos.x, current_pos.y - 1)
+        elif direction == Direction.SOUTH:
+            return Position(current_pos.x, current_pos.y + 1)
+        elif direction == Direction.EAST:
+            return Position(current_pos.x + 1, current_pos.y)
+        else:  # WEST
+            return Position(current_pos.x - 1, current_pos.y)
+
+    def _is_valid_move(self, new_pos, enemy):
+        """移動が有効かチェック"""
+        # GameStateのボードシステムを使用
+        if self.current_state is None or self.current_state.board is None:
+            return False
+
+        # is_passableメソッドを使用（境界とボードのチェックを一括実行）
+        return self.current_state.board.is_passable(new_pos)
+
     def get_current_state(self) -> Optional[GameState]:
         """現在のゲーム状態を取得"""
         # Thread safety: current_stateのスナップショットを取得
@@ -924,6 +989,192 @@ class GameStateManager:
         
         return False
 
+    def _calculate_rotation_turns(self, current_direction: Direction, target_direction: Direction) -> int:
+        """方向転換に必要なターン数を計算"""
+        if current_direction == target_direction:
+            return 0
+
+        directions = [Direction.NORTH, Direction.EAST, Direction.SOUTH, Direction.WEST]
+        current_index = directions.index(current_direction)
+        target_index = directions.index(target_direction)
+
+        # 時計回りと反時計回りの距離を計算
+        clockwise_distance = (target_index - current_index) % 4
+        counterclockwise_distance = (current_index - target_index) % 4
+
+        # 最短距離を選択（各ステップ=1ターン）
+        return min(clockwise_distance, counterclockwise_distance)
+
+    def _get_next_rotation_step(self, current_direction: Direction, target_direction: Direction) -> Direction:
+        """次の回転ステップを取得（時計回りまたは反時計回り、最短ルートを選択）"""
+        if current_direction == target_direction:
+            return current_direction
+
+        directions = [Direction.NORTH, Direction.EAST, Direction.SOUTH, Direction.WEST]
+        current_index = directions.index(current_direction)
+        target_index = directions.index(target_direction)
+
+        # 時計回りと反時計回りの距離を計算
+        clockwise_distance = (target_index - current_index) % 4
+        counterclockwise_distance = (current_index - target_index) % 4
+
+        # 最短ルートを選択
+        if clockwise_distance <= counterclockwise_distance:
+            # 時計回りに1ステップ
+            next_index = (current_index + 1) % 4
+        else:
+            # 反時計回りに1ステップ
+            next_index = (current_index - 1) % 4
+
+        return directions[next_index]
+
+    def _execute_enemy_movement(self, enemy, player):
+        """敵の移動処理のみ実行（視界判定は後で実行）"""
+        print(f"🌀 敵は非警戒状態: 巡回モード")
+        print(f"🔍 Debug - behavior_pattern: '{enemy.behavior_pattern}' (type: {type(enemy.behavior_pattern)})")
+        print(f"🔍 Debug - patrol_path: {enemy.patrol_path} (type: {type(enemy.patrol_path)}, len: {len(enemy.patrol_path) if enemy.patrol_path else 'None'})")
+        print(f"🔍 Debug - current_position: {enemy.position}")
+        print(f"🔍 Debug - patrol条件チェック: pattern=='patrol'? {enemy.behavior_pattern == 'patrol'}, patrol_path存在? {bool(enemy.patrol_path)}")
+        if enemy.patrol_path:
+            print(f"🔍 Debug - patrol_path内容: {[f'({p.x},{p.y})' if hasattr(p, 'x') else f'({p[0]},{p[1]})' for p in enemy.patrol_path]}")
+            print(f"🔍 Debug - current_patrol_index: {enemy.current_patrol_index}")
+            next_target = enemy.get_next_patrol_position()
+            print(f"🔍 Debug - get_next_patrol_position() 結果: {next_target}")
+            if next_target:
+                print(f"🔍 Debug - next_target座標: ({next_target.x},{next_target.y})")
+
+        # patrol: 巡回処理
+        if enemy.behavior_pattern == "patrol" and enemy.patrol_path:
+            current_target = enemy.get_next_patrol_position()
+            if current_target:
+                # 目標位置に到達したかチェック
+                if enemy.position == current_target:
+                    # 次のパトロールポイントに進む
+                    enemy.advance_patrol()
+                    current_target = enemy.get_next_patrol_position()
+
+                if current_target and current_target != enemy.position:
+                    # 目標に向かう方向を計算
+                    dx = current_target.x - enemy.position.x
+                    dy = current_target.y - enemy.position.y
+
+                    # 巡回パスに従って正確に移動するため、x軸優先で移動
+                    if dx != 0:
+                        required_direction = Direction.EAST if dx > 0 else Direction.WEST
+                    elif dy != 0:
+                        required_direction = Direction.SOUTH if dy > 0 else Direction.NORTH
+                    else:
+                        required_direction = enemy.direction
+
+                    # 既に正しい方向を向いているかチェック
+                    if enemy.direction == required_direction:
+                        # 移動実行
+                        next_pos = enemy.position.move(required_direction)
+                        if self.current_state.board.is_passable(next_pos):
+                            enemy.position = next_pos
+                    else:
+                        # 方向転換
+                        enemy.direction = required_direction
+
+    def _handle_alerted_enemy(self, enemy, player):
+        """警戒状態の敵の処理 - 既存ロジックを使用"""
+        # 既存の警戒状態処理を呼び出す（243行目以降のコード）
+        distance = abs(player.position.x - enemy.position.x) + abs(player.position.y - enemy.position.y)
+        print(f"⚔️ 敵が積極的行動開始: 警戒={enemy.alerted} 距離={distance}")
+
+        # 敵とプレイヤーの位置関係を計算
+        dx = player.position.x - enemy.position.x
+        dy = player.position.y - enemy.position.y
+        distance = abs(dx) + abs(dy)  # マンハッタン距離
+
+        # 隣接している場合（距離1）の処理
+        if distance == 1:
+            print(f"⚔️ 隣接判定: 敵[{enemy.position.x},{enemy.position.y}] → プレイヤー[{player.position.x},{player.position.y}]")
+
+            # 攻撃に必要な方向を計算
+            if abs(dx) > abs(dy):
+                required_direction = Direction.EAST if dx > 0 else Direction.WEST
+            else:
+                required_direction = Direction.SOUTH if dy > 0 else Direction.NORTH
+
+            # target_directionが設定されている場合は段階的回転を優先
+            if hasattr(enemy, 'target_direction') and enemy.target_direction is not None:
+                # 段階的回転システム：目標方向に向かって1ステップずつ回転
+                if enemy.direction != enemy.target_direction:
+                    next_direction = self._get_next_rotation_step(enemy.direction, enemy.target_direction)
+                    turns_needed = self._calculate_rotation_turns(enemy.direction, enemy.target_direction)
+                    print(f"🔄 段階的方向転換: {enemy.direction.value} → {next_direction.value} (目標: {enemy.target_direction.value}, 残りターン数: {turns_needed})")
+                    enemy.direction = next_direction
+                else:
+                    # 目標方向に到達したので、target_directionをクリア
+                    print(f"✅ 目標方向到達: {enemy.target_direction.value}")
+                    enemy.target_direction = None
+
+                    # 目標方向に到達したので攻撃を実行
+                    damage = enemy.attack_power
+                    actual_damage = player.take_damage(damage)
+                    print(f"💀 敵の攻撃！ {actual_damage}ダメージ (プレイヤーHP: {player.hp}/{player.max_hp})")
+
+                    if not player.is_alive():
+                        print(f"☠️ プレイヤー死亡！")
+                        self.current_state.status = GameStatus.FAILED
+
+            # 通常の攻撃処理（target_directionが設定されていない場合）
+            elif enemy.direction == required_direction:
+                # プレイヤーを攻撃
+                damage = enemy.attack_power
+                actual_damage = player.take_damage(damage)
+                print(f"💀 敵の攻撃！ {actual_damage}ダメージ (プレイヤーHP: {player.hp}/{player.max_hp})")
+
+                if not player.is_alive():
+                    print(f"☠️ プレイヤー死亡！")
+                    self.current_state.status = GameStatus.FAILED
+            else:
+                # 正しい方向を向いていない場合は段階的方向転換（複数ターン消費の可能性）
+                next_direction = self._get_next_rotation_step(enemy.direction, required_direction)
+                turns_needed = self._calculate_rotation_turns(enemy.direction, required_direction)
+                print(f"🔄 段階的方向転換: {enemy.direction.value} → {next_direction.value} (必要ターン数: {turns_needed})")
+                enemy.direction = next_direction
+
+        # 隣接していない場合は1マス近づく移動を試みる（警戒状態のみ）
+        elif distance > 1:
+            # 追跡目標を決定（現在のプレイヤー位置 or 最後に見た位置）
+            can_see = enemy.can_see_player(player.position, self.current_state.board)
+            target_position = player.position if can_see else enemy.last_seen_player
+            if target_position is None:
+                target_position = player.position  # フォールバック
+
+            print(f"🏃 追跡開始: 敵[{enemy.position.x},{enemy.position.y}] → 目標[{target_position.x},{target_position.y}] 距離={distance} ({'直視' if can_see else '記憶'})")
+
+            # プレイヤーに向かって移動
+            dx = target_position.x - enemy.position.x
+            dy = target_position.y - enemy.position.y
+
+            # 移動方向を決定（シンプルな追跡アルゴリズム）
+            move_direction = None
+            if abs(dx) >= abs(dy):
+                # x軸優先追跡
+                print(f"🏃 同一距離追跡（接触重視x軸優先）: target_dx={dx}, target_dy={dy}, 選択方向={'E' if dx > 0 else 'W'}")
+                move_direction = Direction.EAST if dx > 0 else Direction.WEST
+            else:
+                # y軸追跡
+                print(f"🏃 y軸優先追跡: target_dy={dy}, 選択方向={'S' if dy > 0 else 'N'}")
+                move_direction = Direction.SOUTH if dy > 0 else Direction.NORTH
+
+            # 🔧 古いAIロジックを無効化 - 正規のenemy_systemに委譲
+            print(f"🔧 古いAIロジック無効化: 正規のenemy_systemに委譲 (方向={move_direction.value})")
+            # 移動方向が現在の方向と異なる場合は方向転換
+            # if enemy.direction != move_direction:
+            #     print(f"🔄 追跡方向転換: {enemy.direction.value} → {move_direction.value}")
+            #     enemy.direction = move_direction
+            # else:
+            #     # 移動実行
+            #     next_pos = enemy.position.move(move_direction)
+            #     print(f"🏃 追跡移動試行: [{enemy.position.x},{enemy.position.y}] → [{next_pos.x},{next_pos.y}]")
+            #
+            #     if self.current_state.board.is_passable(next_pos):
+            #         enemy.position = next_pos
+
 
 class SpecialErrorHandler:
     """特殊ステージ専用エラー処理とヒントシステム"""
@@ -1035,8 +1286,8 @@ class SpecialErrorHandler:
                 "final_boss": "最終ステージです！これまで学んだすべてのスキルを活用しましょう。"
             }
             return hints.get(situation)
-        
+
         return None
-    
+
 # エクスポート用
 __all__ = ["GameStateManager", "SpecialErrorHandler"]

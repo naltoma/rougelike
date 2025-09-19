@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 🚀 v1.2.5: Enhanced 7-Stage Speed Control Test Suite
 7段階速度制御システムの包括的テストスイート

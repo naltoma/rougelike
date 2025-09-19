@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 pytest設定ファイル
 テスト全体で共有するfixture定義とカスタムマーカー設定

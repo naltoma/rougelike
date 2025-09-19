@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 🆕 v1.2.1: PauseControllerのUnit Tests
 テスト対象: 一時停止制御、PAUSE_PENDING状態管理、アクション境界での一時停止

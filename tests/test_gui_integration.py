@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 🚀 v1.2.5: GUI Integration Test Suite
 7段階速度制御GUI統合テストスイート

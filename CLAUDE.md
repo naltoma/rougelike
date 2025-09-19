@@ -28,6 +28,7 @@ Kiro-style Spec Driven Development implementation using claude code slash comman
 - `attack-system-integration-v1.2.6`: attack機能導入・敵AIカウンター攻撃システム - stage04-06実装・攻撃ベース学習ステージ（v1.2.6で完了） - 詳細は [docs/v1.2.6.md](docs/v1.2.6.md) 参照
 - `pickup-wait-system-v1.2.7`: wait()API導入・敵AI視覚システム・ステージ毎プレイヤー設定・stage07-10実装（v1.2.7で完了） - 詳細は [docs/v1.2.7.md](docs/v1.2.7.md) 参照
 - `special-conditional-stages-v1.2.8`: 特殊条件付きステージ（Stage11-13）・大型敵システム・特殊敵システム実装（v1.2.8で完了） - 詳細は [docs/v1.2.8.md](docs/v1.2.8.md) 参照
+- `random-stage-generation-v1.2.9`: ランダムステージ生成システム - 5種類のステージタイプ（move, attack, pickup, patrol, special）の自動生成・検証機能
 
 ## Development Guidelines
 - Think in English, but generate responses in Japanese (思考は英語、回答の生成は日本語で行うように)
@@ -80,3 +81,35 @@ Managed by `/kiro:steering` command. Updates here reflect command changes.
 - **Always**: Loaded in every interaction (default)
 - **Conditional**: Loaded for specific file patterns (e.g., `"*.test.js"`)
 - **Manual**: Reference with `@filename.md` syntax
+
+## Stage Generation System (v1.2.9)
+
+### Key Components
+- **CLI Tools**: `generate_stage.py`, `validate_stage.py` - Command-line interface for stage generation and validation
+- **Libraries**: `stage_generator/`, `stage_validator/`, `yaml_manager/` - Core generation and validation logic
+- **Output**: `stages/generated_[type]_[seed].yml` - Generated stage files following existing YAML format
+
+### Stage Types & Characteristics
+- **move** (stages 01-03 equivalent): Basic navigation, walls only, APIs: [turn_left, turn_right, move, see]
+- **attack** (stages 04-06 equivalent): Combat scenarios, static enemies, APIs: + [attack]
+- **pickup** (stages 07-09 equivalent): Item collection, mixed obstacles, APIs: + [pickup]
+- **patrol** (stages 10 equivalent): Moving enemies, stealth mechanics, APIs: + [wait]
+- **special** (stages 11-13 equivalent): Large enemies (2x2, 3x3, 2x3), complex conditions, APIs: all
+
+### Generation Constraints
+- **YAML Format**: Must use existing YAML structure, no new attributes
+- **File Protection**: Cannot modify main_*.py files (user exercise files)
+- **Reproducibility**: Same seed + type = identical stage
+- **Solvability**: All generated stages must be validated as completable
+
+### Usage Patterns
+```bash
+# Generate with seed for reproducibility
+python generate_stage.py --type move --seed 123
+
+# Generate and validate in one step
+python generate_stage.py --type attack --seed 456 --validate
+
+# Validate existing stage files
+python validate_stage.py --file stages/stage01.yml --detailed
+```

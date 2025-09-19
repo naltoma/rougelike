@@ -102,22 +102,34 @@ class Validator:
                 return True
         return False
     
-    def can_attack_target(self, 
-                         attacker_pos: Position, 
-                         attacker_direction: Direction, 
+    def can_attack_target(self,
+                         attacker_pos: Position,
+                         attacker_direction: Direction,
                          game_state: GameState) -> Tuple[bool, Optional[Enemy], str]:
         """攻撃対象がいるかチェック"""
         target_pos = attacker_pos.move(attacker_direction)
-        
+
+        print(f"🎯 攻撃判定開始:")
+        print(f"   攻撃者位置: [{attacker_pos.x},{attacker_pos.y}]")
+        print(f"   攻撃者方向: {attacker_direction.value}")
+        print(f"   攻撃対象位置: [{target_pos.x},{target_pos.y}]")
+
         # 攻撃範囲チェック（ボード内か）
         if not game_state.board.is_valid_position(target_pos):
+            print(f"   判定結果: 攻撃範囲外")
             return False, None, "攻撃範囲外です"
-        
+
         # 攻撃対象の敵を探す
-        for enemy in game_state.enemies:
-            if target_pos in enemy.get_occupied_positions():
+        print(f"   敵一覧をチェック（総数: {len(game_state.enemies)}）:")
+        for i, enemy in enumerate(game_state.enemies):
+            occupied_positions = enemy.get_occupied_positions()
+            print(f"   敵{i}: 位置[{enemy.position.x},{enemy.position.y}] 占有範囲{[(p.x, p.y) for p in occupied_positions]}")
+
+            if target_pos in occupied_positions:
+                print(f"   判定結果: 攻撃対象発見！ 敵{i}")
                 return True, enemy, "攻撃対象があります"
-        
+
+        print(f"   判定結果: 攻撃対象なし")
         return False, None, "攻撃対象がいません"
     
     def validate_player_direction(self, direction: Direction) -> bool:

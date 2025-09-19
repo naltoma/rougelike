@@ -31,8 +31,11 @@ enemies:
   - id: "warrior1"
     type: "orc"
     position: [4, 2]
+    direction: "N"
     hp: 31
+    max_hp: 100
     attack_power: 100
+    vision_range: 2
     behavior: "static"
 
 items:

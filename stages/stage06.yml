@@ -20,9 +20,9 @@ board:
 player:
   start: [0, 2]
   direction: "E"
-  hp: 100
-  max_hp: 100
-  attack_power: 10
+  hp: 120
+  max_hp: 120
+  attack_power: 35
 
 goal:
   position: [6, 2]
@@ -31,7 +31,11 @@ enemies:
   - id: "dragon1"
     type: "dragon"
     position: [3, 2]
+    direction: "W"
     hp: 100
+    max_hp: 100
+    attack_power: 15
+    vision_range: 2
     behavior: "static"
 
 items: []

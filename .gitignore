@@ -2,6 +2,8 @@ __pycache__
 .DS_Store
 data/
 main_*.py
+stages/generated_*.yml
+stages/test_*.yml
 
 # OAuth credentials (security sensitive)
 .oauth_credentials/

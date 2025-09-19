@@ -272,7 +272,7 @@ class AttackCommand(Command):
         else:
             # 攻撃実行
             damage = player.attack_power
-            actual_damage = enemy.take_damage(damage)
+            actual_damage = enemy.take_damage(damage, attacker_position=player.position)
             
             defeated = not enemy.is_alive()
             if defeated:

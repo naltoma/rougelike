@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 🆕 v1.2.1: StateTransitionManagerのUnit Tests
 テスト対象: 状態遷移管理、妥当性検証、ロールバック機能

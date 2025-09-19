@@ -28,7 +28,11 @@ enemies:
   - id: "orc1"
     type: "orc"
     position: [3, 2]
+    direction: "W"
     hp: 90
+    max_hp: 90
+    attack_power: 10
+    vision_range: 2
     behavior: "static"
 
 items: []

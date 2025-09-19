@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 SessionLogManager診断機能のテスト
 """
