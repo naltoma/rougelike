@@ -345,7 +345,7 @@ ENABLE_LOGGING = False  # セッションログを有効化
 # ================================
 
 # APIをsolve()関数外でimport（関数内で使用可能）
-from engine.api import turn_left, turn_right, move, attack, pickup, see, wait, set_auto_render
+from engine.api import turn_left, turn_right, move, attack, pickup, see, wait, set_auto_render, get_stage_info
 
 def solve():
     """

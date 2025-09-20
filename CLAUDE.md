@@ -28,7 +28,8 @@ Kiro-style Spec Driven Development implementation using claude code slash comman
 - `attack-system-integration-v1.2.6`: attack機能導入・敵AIカウンター攻撃システム - stage04-06実装・攻撃ベース学習ステージ（v1.2.6で完了） - 詳細は [docs/v1.2.6.md](docs/v1.2.6.md) 参照
 - `pickup-wait-system-v1.2.7`: wait()API導入・敵AI視覚システム・ステージ毎プレイヤー設定・stage07-10実装（v1.2.7で完了） - 詳細は [docs/v1.2.7.md](docs/v1.2.7.md) 参照
 - `special-conditional-stages-v1.2.8`: 特殊条件付きステージ（Stage11-13）・大型敵システム・特殊敵システム実装（v1.2.8で完了） - 詳細は [docs/v1.2.8.md](docs/v1.2.8.md) 参照
-- `random-stage-generation-v1.2.9`: ランダムステージ生成システム - 5種類のステージタイプ（move, attack, pickup, patrol, special）の自動生成・検証機能
+- `random-stage-generation-v1.2.9`: ランダムステージ生成システム - 5種類のステージタイプ（move, attack, pickup, patrol, special）の自動生成・検証機能（v1.2.9で完了） - 詳細は [docs/v1.2.9.md](docs/v1.2.9.md) 参照
+- `see-tutorial-documentation-v1.2.10`: see()関数チュートリアルドキュメント作成 - プログラミング初心者向けの段階的学習教材、stage01完全攻略手順
 
 ## Development Guidelines
 - Think in English, but generate responses in Japanese (思考は英語、回答の生成は日本語で行うように)

@@ -263,7 +263,7 @@ class StageLoader:
             if not isinstance(allowed_apis, list):
                 raise StageValidationError("constraints.allowed_apisはリスト形式である必要があります")
             
-            valid_apis = ["turn_left", "turn_right", "move", "attack", "pickup", "wait", "see"]
+            valid_apis = ["turn_left", "turn_right", "move", "attack", "pickup", "wait", "see", "get_stage_info"]
             for api in allowed_apis:
                 if api not in valid_apis:
                     raise StageValidationError(f"無効なAPI: {api}. 有効なAPI: {valid_apis}")

@@ -698,7 +698,54 @@ class APILayer:
             self._handle_error(e, {"action": "wait", "operation": "turn_management"})
             return False
     
-    def see(self) -> Dict[str, Any]:
+    def get_stage_info(self) -> Dict[str, Any]:
+        """ステージの基本情報を取得"""
+        try:
+            self._ensure_initialized()
+            self._check_api_allowed("get_stage_info")
+
+            game_state = self.game_manager.get_current_state()
+            if game_state is None:
+                return {}
+
+            # ステージの基本情報を返却
+            result = {
+                "stage_id": self.current_stage_id,
+                "board": {
+                    "size": [game_state.board.width, game_state.board.height]
+                },
+                "goal": {
+                    "position": [game_state.goal_position.x, game_state.goal_position.y]
+                },
+                "player": {
+                    "start_position": [game_state.player.position.x, game_state.player.position.y],
+                    "max_hp": game_state.player.max_hp,
+                    "attack_power": game_state.player.attack_power
+                },
+                "constraints": {
+                    "max_turns": game_state.max_turns,
+                    "allowed_apis": self.allowed_apis.copy()
+                },
+                "metadata": {
+                    "enemy_count": len([e for e in game_state.enemies if e.is_alive()]),
+                    "item_count": len(game_state.items),
+                    "wall_count": len(game_state.board.walls)
+                }
+            }
+
+            # API呼び出し記録（see()と同様にターン非消費）
+            from .commands import CommandResult
+            self._record_call("get_stage_info", ExecutionResult(
+                result=CommandResult.SUCCESS,
+                message="ステージ情報取得完了"
+            ))
+
+            return result
+        except Exception as e:
+            self._handle_error(e, {"action": "get_stage_info", "operation": "stage_information_retrieval"})
+            return {}
+
+    def see(self, vision_range: int = 2) -> Dict[str, Any]:
         """周囲の状況を確認"""
         try:
             self._ensure_initialized()
@@ -731,14 +778,6 @@ class APILayer:
             player = game_state.player
             current_pos = player.position
             
-            # 各方向の情報を取得
-            directions = {
-                "front": player.direction,
-                "left": player.direction.turn_left(),
-                "right": player.direction.turn_right(),
-                "back": player.direction.turn_left().turn_left()
-            }
-            
             result = {
                 "player": {
                     "position": [current_pos.x, current_pos.y],
@@ -747,73 +786,50 @@ class APILayer:
                     "attack_power": player.attack_power
                 },
                 "surroundings": {},
+                "vision_map": {},  # 新規: 視界範囲内の全情報
                 # v1.2.7 拡張: アイテム・敵情報返却
                 "items": [],
                 "enemies": []
             }
-            
-            # 各方向の状況をチェック
+
+            # 基本方向（従来互換性のため）
+            directions = {
+                "front": player.direction,
+                "left": player.direction.turn_left(),
+                "right": player.direction.turn_right(),
+                "back": player.direction.turn_left().turn_left()
+            }
+
+            # 各方向の状況をチェック（距離1、従来互換性）
             for dir_name, direction in directions.items():
                 check_pos = current_pos.move(direction)
-                
-                # 境界チェック
-                if not game_state.board.is_valid_position(check_pos):
-                    result["surroundings"][dir_name] = "boundary"
-                    continue
-                
-                # 壁チェック
-                if game_state.board.is_wall(check_pos):
-                    result["surroundings"][dir_name] = "wall"
-                    continue
-                
-                # 移動禁止マスチェック
-                if game_state.board.is_forbidden(check_pos):
-                    result["surroundings"][dir_name] = "forbidden"
-                    continue
-                
-                # 敵チェック
-                enemy = game_state.get_enemy_at(check_pos)
-                if enemy:
-                    enemy_info = {
-                        "type": "enemy",
-                        "enemy_type": enemy.enemy_type.value,
-                        "position": [enemy.position.x, enemy.position.y],
-                        "hp": enemy.hp,
-                        "max_hp": enemy.max_hp,
-                        "attack_power": enemy.attack_power,
-                        "direction": enemy.direction.value,
-                        "is_alive": enemy.is_alive(),
-                        "alerted": enemy.alerted  # 怒りモード等の判定用
+                cell_info = self._get_cell_info(game_state, check_pos)
+                result["surroundings"][dir_name] = cell_info
+
+            # 視界範囲内の全セル情報を取得
+            for dx in range(-vision_range, vision_range + 1):
+                for dy in range(-vision_range, vision_range + 1):
+                    # 距離計算（マンハッタン距離）
+                    distance = abs(dx) + abs(dy)
+                    if distance == 0 or distance > vision_range:
+                        continue
+
+                    check_x = current_pos.x + dx
+                    check_y = current_pos.y + dy
+
+                    from .game_state import Position
+                    check_pos = Position(check_x, check_y)
+
+                    # セル情報を取得
+                    cell_info = self._get_cell_info(game_state, check_pos)
+
+                    # 座標をキーとして保存
+                    coord_key = f"{check_x},{check_y}"
+                    result["vision_map"][coord_key] = {
+                        "position": [check_x, check_y],
+                        "distance": distance,
+                        "content": cell_info
                     }
-                    
-                    # AdvancedEnemyの場合は追加情報
-                    if hasattr(enemy, 'movement_mode'):
-                        enemy_info["movement_mode"] = enemy.movement_mode
-                    if hasattr(enemy, 'vision_range'):
-                        enemy_info["vision_range"] = enemy.vision_range
-                    if hasattr(enemy, 'current_state'):
-                        enemy_info["state"] = enemy.current_state.value
-                    
-                    result["surroundings"][dir_name] = enemy_info
-                    continue
-                
-                # アイテムチェック
-                item = game_state.get_item_at(check_pos)
-                if item:
-                    result["surroundings"][dir_name] = {
-                        "type": "item",
-                        "item_type": item.item_type.value,
-                        "name": item.name
-                    }
-                    continue
-                
-                # ゴールチェック
-                if check_pos == game_state.goal_position:
-                    result["surroundings"][dir_name] = "goal"
-                    continue
-                
-                # 空きマス
-                result["surroundings"][dir_name] = "empty"
             
             # 足元の情報
             item_at_foot = game_state.get_item_at(current_pos)
@@ -901,8 +917,62 @@ class APILayer:
         except Exception as e:
             self._handle_error(e, {"action": "see", "operation": "environment_observation"})
             return {}
-    
-    
+
+    def _get_cell_info(self, game_state, check_pos):
+        """指定位置のセル情報を取得"""
+        # 境界チェック
+        if not game_state.board.is_valid_position(check_pos):
+            return "boundary"
+
+        # 壁チェック
+        if game_state.board.is_wall(check_pos):
+            return "wall"
+
+        # 移動禁止マスチェック
+        if game_state.board.is_forbidden(check_pos):
+            return "forbidden"
+
+        # 敵チェック
+        enemy = game_state.get_enemy_at(check_pos)
+        if enemy:
+            enemy_info = {
+                "type": "enemy",
+                "enemy_type": enemy.enemy_type.value,
+                "position": [enemy.position.x, enemy.position.y],
+                "hp": enemy.hp,
+                "max_hp": enemy.max_hp,
+                "attack_power": enemy.attack_power,
+                "direction": enemy.direction.value,
+                "is_alive": enemy.is_alive(),
+                "alerted": enemy.alerted  # 怒りモード等の判定用
+            }
+
+            # AdvancedEnemyの場合は追加情報
+            if hasattr(enemy, 'movement_mode'):
+                enemy_info["movement_mode"] = enemy.movement_mode
+            if hasattr(enemy, 'vision_range'):
+                enemy_info["vision_range"] = enemy.vision_range
+            if hasattr(enemy, 'current_state'):
+                enemy_info["state"] = enemy.current_state.value
+
+            return enemy_info
+
+        # アイテムチェック
+        item = game_state.get_item_at(check_pos)
+        if item:
+            return {
+                "type": "item",
+                "item_type": item.item_type.value,
+                "name": item.name
+            }
+
+        # ゴールチェック
+        if check_pos == game_state.goal_position:
+            return "goal"
+
+        # 空きマス
+        return "empty"
+
     def _display_vision_map(self, game_state) -> None:
         """敵の視野範囲をマップ表示"""
         if not hasattr(game_state, 'player'):
@@ -1642,13 +1712,25 @@ def wait() -> bool:
     return _global_api.wait()
 
 
-def see() -> Dict[str, Any]:
+def see(vision_range: int = 2) -> Dict[str, Any]:
     """周囲の状況を確認
-    
+
+    Args:
+        vision_range: 視界範囲（マンハッタン距離、デフォルト=2）
+
     Returns:
         Dict: 周囲の状況情報
     """
-    return _global_api.see()
+    return _global_api.see(vision_range)
+
+
+def get_stage_info() -> Dict[str, Any]:
+    """ステージの基本情報を取得
+
+    Returns:
+        Dict: ステージの基本情報
+    """
+    return _global_api.get_stage_info()
 
 
 

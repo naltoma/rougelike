@@ -1,13 +1,13 @@
 # Python初学者向けローグライク演習フレームワーク
 
-[![Version](https://img.shields.io/badge/version-v1.2.9-blue.svg)](VERSION_HISTORY.md)
+[![Version](https://img.shields.io/badge/version-v1.2.10-blue.svg)](VERSION_HISTORY.md)
 [![Python](https://img.shields.io/badge/python-3.8+-green.svg)](https://python.org)
 [![Tests](https://img.shields.io/badge/tests-88.9%25-brightgreen.svg)](#🧪-テスト実行)
 [![Quality](https://img.shields.io/badge/quality-優良⭐-gold.svg)](#📈-品質メトリクス)
 
 Python初学者のための教育用ローグライクゲームフレームワークです。体験的なプログラミング学習を通じて、基礎的なプログラミングスキルを習得できます。
 
-> **🎯 v1.2.9 ランダムステージ生成システム完成！** 5種類のステージタイプ（move/attack/pickup/patrol/special）完全対応・CLI/ライブラリ統合・A*解法探索・無限学習コンテンツ自動生成実現 - 詳細は [VERSION_HISTORY.md](VERSION_HISTORY.md) をご覧ください
+> **📚 v1.2.10 seeチュートリアル体系化完成！** get_stage_info()API追加・4段階学習システム・ハードコーディング排除・vision_map機能拡張で包括的プログラミング教育環境を実現 - 詳細は [docs/v1.2.10.md](docs/v1.2.10.md) をご覧ください
 
 ## 🎯 特徴
 
@@ -16,6 +16,9 @@ Python初学者のための教育用ローグライクゲームフレームワ�
 - **無限ループ自動検出**: 初学者が陥りやすい問題を早期発見
 - **段階的ヒントシステム**: 学習者の進度に応じた適応的支援
 - **個別学習プロファイル**: 学習者の特性を分析・最適化
+- **📚 包括的チュートリアル体系**: 4段階学習システム（基礎→実践→応用→参照）
+- **🚫 ハードコーディング排除**: get_stage_info()による動的設計教育
+- **👁️ 拡張視界システム**: vision_map・vision_range制御で戦略的思考育成
 - **⚡ 7段階速度制御**: x1〜x50でContinue実行速度を調整・デバッグ効率向上
 - **⚔️ 戦闘ベース学習**: Stage04-07で攻撃システムを通じた戦略的思考習得
 - **🛡️ wait()API**: Stage08-10で戦術的待機・敵行動観察・タイミング判断学習
@@ -79,6 +82,13 @@ rougelike/
 ├── data/                    # データ保存
 ├── config/                  # 設定ファイル
 └── docs/                    # ドキュメント
+    ├── see_tutorial/        # 📚 v1.2.10 包括的seeチュートリアル体系
+    │   ├── README.md        # 学習ガイド・チュートリアル一覧
+    │   ├── basic_api.md     # API基礎習得（353行）
+    │   ├── simple_algorithm.md # Stage01特化アルゴリズム（522行）
+    │   ├── general_purpose.md # 汎用プレイヤー構築（1620行）
+    │   └── see_description.md # API完全リファレンス（414行）
+    └── v1.2.10.md          # v1.2.10リリースノート
 ```
 
 ## 🚀 クイックスタート
@@ -98,8 +108,10 @@ game.turn_left()   # 左回転
 game.turn_right()  # 右回転
 
 # 環境確認・戦術
-game.see()         # 周囲を確認
-game.wait()        # 1ターン待機（敵行動観察）
+info = game.see()         # 周囲を確認（デフォルト視界範囲2）
+info = game.see(3)        # 広範囲観測（視界範囲3）
+stage_info = game.get_stage_info()  # ステージ情報取得（v1.2.10新機能）
+game.wait()               # 1ターン待機（敵行動観察）
 
 # アクション
 game.attack()      # 攻撃
@@ -371,7 +383,19 @@ make test
 
 ## 📚 ドキュメント
 
+### メインドキュメント
+- **[v1.2.10リリースノート](docs/v1.2.10.md)** - 最新アップデート詳細
 - **[バージョン履歴](VERSION_HISTORY.md)** - リリース履歴と変更点
+
+### 📚 学習チュートリアル (v1.2.10 新機能)
+- **[seeチュートリアル体系](docs/see_tutorial/)** - 4段階学習システム
+  - [学習ガイド](docs/see_tutorial/README.md) - 推奨学習パス・チュートリアル一覧
+  - [基本API習得](docs/see_tutorial/basic_api.md) - see()・get_stage_info()の基礎
+  - [シンプルアルゴリズム実践](docs/see_tutorial/simple_algorithm.md) - Stage01確実クリア手法
+  - [汎用的プレイヤー構築](docs/see_tutorial/general_purpose.md) - 複数ステージ対応設計
+  - [API完全リファレンス](docs/see_tutorial/see_description.md) - v1.2.10対応仕様書
+
+### システム詳細
 - [進捗管理ガイド](PROGRESSION_GUIDE.md) - 進捗機能の使用方法
 - [セッションログガイド](SESSION_LOGGING_GUIDE.md) - ログ機能の詳細
 - [Google Sheets設定](GOOGLE_SHEETS_SETUP.md) - データ連携設定
@@ -403,12 +427,12 @@ Python初学者教育の向上を目指して開発されました。教育現�
 
 ## 📋 更新履歴
 
-最新バージョン: **v1.2.9** (2025年9月19日)
-- 🎯 ランダムステージ生成システム完成
-- 🚀 5種類のステージタイプ（move/attack/pickup/patrol/special）完全対応
-- 💻 CLI・ライブラリ・検証システム統合
-- 🧮 A*解法探索・制限無し探索モード実装
-- 📁 プロジェクト整理・テストシステム強化
+最新バージョン: **v1.2.10** (2025年9月20日)
+- 📚 包括的seeチュートリアル体系構築（4段階学習システム）
+- 🚫 get_stage_info() API追加によるハードコーディング排除
+- 👁️ see()機能拡張（vision_map・vision_range制御）
+- 🎯 段階的学習環境整備（基礎→実践→応用→参照）
+- 📖 API完全リファレンス・学習ガイド充実
 
 詳細な変更履歴は [VERSION_HISTORY.md](VERSION_HISTORY.md) をご覧ください。
 
@@ -421,4 +445,4 @@ Python初学者教育の向上を目指して開発されました。教育現�
 
 ---
 
-**🎮 楽しく学び、効果的に指導する - Python教育の新しい形 v1.2.9**
+**🎮 楽しく学び、効果的に指導する - Python教育の新しい形 v1.2.10**

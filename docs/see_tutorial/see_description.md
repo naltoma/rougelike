@@ -1,22 +1,49 @@
-# see() 関数使用マニュアル
+# see() 関数 & get_stage_info() API 完全リファレンス (v1.2.10対応)
 
 ## 概要
+
+### see() 関数
 `see()` 関数は周囲の状況を確認する情報取得専用関数です。
 - **ターンを消費しません**
 - **ステップ実行で一時停止しません**
 - **リアルタイムな状況確認が可能**
+- **視界範囲を指定可能** (vision_range パラメータ)
+
+### get_stage_info() 関数
+`get_stage_info()` 関数はステージの静的情報を取得する関数です。
+- **ステージ構造の動的取得**
+- **ハードコーディング回避**
+- **汎用的なコード設計の基盤**
 
 ## 基本的な使用方法
+
+### see() 関数
 ```python
+# デフォルト視界範囲(2)での観測
 info = see()
 print(info)  # 全情報を表示
+
+# 視界範囲を指定
+info_narrow = see(1)    # 隣接セルのみ
+info_wide = see(3)      # 広範囲観測
 
 # 特定情報のみ取得
 player_pos = info["player"]["position"]
 enemy_count = len(info["enemies"])
 ```
 
-## 返却データ構造
+### get_stage_info() 関数
+```python
+# ステージ情報の取得
+stage_info = get_stage_info()
+print(f"ステージID: {stage_info['stage_id']}")
+print(f"ボードサイズ: {stage_info['board']['size']}")
+print(f"ゴール位置: {stage_info['goal']['position']}")
+print(f"最大ターン数: {stage_info['constraints']['max_turns']}")
+print(f"利用可能API: {stage_info['constraints']['allowed_apis']}")
+```
+
+## see() 関数 返却データ構造
 
 ### 1. プレイヤー情報 (`info["player"]`)
 ```python
@@ -116,6 +143,73 @@ enemy_count = len(info["enemies"])
 }
 ```
 
+### 6. 視界マップ (`info["vision_map"]`) - v1.2.10追加
+```python
+{
+    "1,0": {
+        "position": [1, 0],
+        "distance": 1,
+        "content": "empty"
+    },
+    "2,1": {
+        "position": [2, 1],
+        "distance": 2,
+        "content": "wall"
+    },
+    "3,2": {
+        "position": [3, 2],
+        "distance": 3,
+        "content": {
+            "type": "enemy",
+            "enemy_type": "normal",
+            # ... 敵の詳細情報
+        }
+    }
+}
+```
+
+## get_stage_info() 関数 返却データ構造
+
+### ステージ情報
+```python
+{
+    "stage_id": "stage01",
+    "board": {
+        "size": [5, 5]           # ボードサイズ [width, height]
+    },
+    "goal": {
+        "position": [4, 4]       # ゴール位置
+    },
+    "constraints": {
+        "max_turns": 20,         # 最大ターン数
+        "allowed_apis": [        # 使用可能API一覧
+            "turn_left",
+            "turn_right",
+            "move",
+            "see",
+            "get_stage_info"
+        ]
+    },
+    "enemies": [                 # 初期敵配置（存在する場合）
+        {
+            "position": [2, 3],
+            "type": "normal",
+            "hp": 1000
+        }
+    ],
+    "walls": [                   # 壁の位置一覧
+        [2, 2]
+    ],
+    "items": [                   # 初期アイテム配置（存在する場合）
+        {
+            "position": [1, 3],
+            "type": "weapon",
+            "name": "sword"
+        }
+    ]
+}
+```
+
 ## 全ステージ共通機能
 
 ### 敵状態判定（怒りモード等）
@@ -166,7 +260,57 @@ if check_enemy_rage_mode():
 
 ## 実用例
 
-### 1. 安全確認
+### 1. ハードコーディング回避設計
+```python
+def get_dynamic_goal():
+    """動的にゴール位置を取得"""
+    stage_info = get_stage_info()
+    return stage_info["goal"]["position"]
+
+def is_api_available(api_name):
+    """指定APIが使用可能かチェック"""
+    stage_info = get_stage_info()
+    return api_name in stage_info["constraints"]["allowed_apis"]
+
+# 使用例
+goal_pos = get_dynamic_goal()  # ハードコーディング [4,4] を回避
+if is_api_available("attack"):
+    attack()  # 攻撃可能ステージでのみ実行
+```
+
+### 2. 視界マップ活用 (v1.2.10)
+```python
+def analyze_surroundings():
+    """視界範囲内の詳細分析"""
+    info = see(3)  # 広範囲観測
+    vision_map = info["vision_map"]
+
+    enemies_in_sight = []
+    walls_in_sight = []
+
+    for coord, cell_data in vision_map.items():
+        content = cell_data["content"]
+        position = cell_data["position"]
+        distance = cell_data["distance"]
+
+        if content == "wall":
+            walls_in_sight.append(position)
+        elif isinstance(content, dict) and content["type"] == "enemy":
+            enemies_in_sight.append({
+                "position": position,
+                "distance": distance,
+                "hp": content["hp"],
+                "alerted": content["alerted"]
+            })
+
+    return enemies_in_sight, walls_in_sight
+
+# 使用例
+enemies, walls = analyze_surroundings()
+print(f"視界内敵数: {len(enemies)}, 壁数: {len(walls)}")
+```
+
+### 3. 安全確認
 ```python
 def is_safe_to_move():
     info = see()
@@ -225,16 +369,46 @@ if should_retreat():
 
 ## 注意事項
 
+### see() 関数
 1. **リアルタイム情報**：see()は現在の状況を返します
 2. **ターン非消費**：何度呼び出してもターンは進みません
 3. **座標系**：[x, y] 形式（x:横, y:縦）
 4. **敵状態判定**：`alerted`フラグで警戒・怒りモードを判定（全ステージ共通）
 5. **方向ベース参照**：`info["surroundings"]["front"]`で正面の敵情報を直接取得
 6. **型チェック重要**：辞書型の場合のみ詳細情報が含まれます
+7. **視界範囲制御**：vision_rangeパラメータで観測範囲を調整可能
+
+### get_stage_info() 関数
+1. **静的情報**：ゲーム開始時の初期状態情報を返します
+2. **ターン非消費**：see()同様、ターンを消費しません
+3. **汎用性の重要さ**：ハードコーディングを避け、動的に情報取得することで複数ステージ対応可能
+4. **初期化データ**：enemies、items等は初期配置情報（現在状態はsee()で確認）
 
 ## デバッグ用途
 ```python
 import json
+
+# see()の全情報を整形表示
 info = see()
-print(json.dumps(info, indent=2))  # 全情報を整形表示
+print("=== see() 情報 ===")
+print(json.dumps(info, indent=2))
+
+# get_stage_info()の全情報を整形表示
+stage_info = get_stage_info()
+print("\n=== get_stage_info() 情報 ===")
+print(json.dumps(stage_info, indent=2))
+
+# 特定情報のみ表示
+print(f"\n=== 要約情報 ===")
+print(f"ステージ: {stage_info['stage_id']}")
+print(f"プレイヤー位置: {info['player']['position']}")
+print(f"ゴール位置: {stage_info['goal']['position']}")
+print(f"敵数: {len(info['enemies'])}")
+print(f"視界内セル数: {len(info['vision_map'])}")
 ```
+
+## v1.2.10での新機能・変更点
+
+1. **vision_map の追加**: 座標ベースでの詳細な視界情報取得が可能
+2. **get_stage_info() の標準化**: 全チュートリアルでハードコーディング回避を推奨
+3. **視界範囲制御の活用**: 戦略に応じた観測範囲の調整

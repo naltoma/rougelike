@@ -32,4 +32,4 @@ items: []
 
 constraints:
   max_turns: 20
-  allowed_apis: ["turn_left", "turn_right", "move", "see"]
+  allowed_apis: ["turn_left", "turn_right", "move", "see", "get_stage_info"]
