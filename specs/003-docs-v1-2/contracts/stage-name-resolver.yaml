@@ -1,0 +1,98 @@
+openapi: 3.0.0
+info:
+  title: StageNameResolver API
+  description: API contract for resolving stage names from main_*.py files
+  version: 1.0.0
+
+components:
+  schemas:
+    StageResolution:
+      type: object
+      properties:
+        stage_id:
+          type: string
+          description: The STAGE_ID value extracted from file
+          pattern: '^stage\d{2}$'
+          example: "stage09"
+        file_path:
+          type: string
+          description: Path to the analyzed main_*.py file
+        resolved_name:
+          type: string
+          description: Human-readable stage name for display
+        is_cached:
+          type: boolean
+          description: True if result was retrieved from cache
+      required:
+        - stage_id
+        - file_path
+        - resolved_name
+        - is_cached
+
+    ValidationResult:
+      type: object
+      properties:
+        is_valid:
+          type: boolean
+          description: True if stage_id format is valid
+        stage_id:
+          type: string
+          description: The validated stage_id
+        error_message:
+          type: string
+          nullable: true
+          description: Error message if validation fails
+      required:
+        - is_valid
+        - stage_id
+
+  interfaces:
+    StageNameResolver:
+      methods:
+        resolve_stage_name:
+          parameters:
+            - name: file_path
+              schema:
+                type: string
+              required: true
+              description: Path to main_*.py file containing STAGE_ID
+          returns:
+            schema:
+              $ref: '#/components/schemas/StageResolution'
+          description: Extracts STAGE_ID from file and returns resolution info
+          errors:
+            - FileNotFoundError: When file_path does not exist
+            - ImportError: When file cannot be imported as Python module
+            - AttributeError: When STAGE_ID variable is not found
+
+        validate_stage_id:
+          parameters:
+            - name: stage_id
+              schema:
+                type: string
+              required: true
+          returns:
+            schema:
+              $ref: '#/components/schemas/ValidationResult'
+          description: Validates stage_id format (stage + 2 digits)
+
+        get_display_name:
+          parameters:
+            - name: stage_id
+              schema:
+                type: string
+              required: true
+          returns:
+            schema:
+              type: string
+          description: Converts stage_id to human-readable display name
+          example:
+            input: "stage09"
+            output: "Stage: stage09"
+
+        clear_cache:
+          parameters: []
+          returns:
+            schema:
+              type: "null"
+          description: Clears all cached stage resolutions

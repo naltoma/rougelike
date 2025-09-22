@@ -1,0 +1,154 @@
+openapi: 3.0.0
+info:
+  title: DisplayStateManager API
+  description: API contract for managing visual formatting of status changes
+  version: 1.0.0
+
+components:
+  schemas:
+    EmphasisType:
+      type: string
+      enum: [default, decreased, increased]
+      description: Visual emphasis type for status display
+
+    ColorConfig:
+      type: object
+      properties:
+        default_color:
+          type: array
+          items:
+            type: integer
+            minimum: 0
+            maximum: 255
+          minItems: 3
+          maxItems: 3
+          example: [255, 255, 255]
+        decreased_color:
+          type: array
+          items:
+            type: integer
+            minimum: 0
+            maximum: 255
+          minItems: 3
+          maxItems: 3
+          example: [255, 0, 0]
+        increased_color:
+          type: array
+          items:
+            type: integer
+            minimum: 0
+            maximum: 255
+          minItems: 3
+          maxItems: 3
+          example: [0, 255, 0]
+      required:
+        - default_color
+        - decreased_color
+        - increased_color
+
+    FormattedText:
+      type: object
+      properties:
+        content:
+          type: string
+          description: The formatted text content with symbols
+          example: "90/100 ↓10"
+        color:
+          type: array
+          items:
+            type: integer
+            minimum: 0
+            maximum: 255
+          minItems: 3
+          maxItems: 3
+          description: RGB color values
+        is_bold:
+          type: boolean
+          description: Whether text should be rendered in bold
+        emphasis_type:
+          $ref: '#/components/schemas/EmphasisType'
+      required:
+        - content
+        - color
+        - is_bold
+        - emphasis_type
+
+    PygameSurface:
+      type: object
+      description: Represents a pygame.Surface object for rendering
+      properties:
+        width:
+          type: integer
+        height:
+          type: integer
+        content_hash:
+          type: string
+          description: Hash of rendered content for caching
+
+  interfaces:
+    DisplayStateManager:
+      methods:
+        format_status_text:
+          parameters:
+            - name: entity_id
+              schema:
+                type: string
+              required: true
+            - name: status_key
+              schema:
+                type: string
+              required: true
+            - name: value
+              schema:
+                type: integer
+              required: true
+            - name: change
+              schema:
+                type: integer
+              required: true
+              description: Change delta (positive=increase, negative=decrease, 0=no change)
+          returns:
+            schema:
+              $ref: '#/components/schemas/FormattedText'
+          description: Creates formatted text object based on status value and change
+
+        get_emphasis_type:
+          parameters:
+            - name: change_delta
+              schema:
+                type: integer
+              required: true
+          returns:
+            schema:
+              $ref: '#/components/schemas/EmphasisType'
+          description: Determines emphasis type based on change delta
+          logic:
+            - "change_delta < 0: decreased"
+            - "change_delta > 0: increased"
+            - "change_delta == 0: default"
+
+        apply_color_formatting:
+          parameters:
+            - name: text
+              schema:
+                type: string
+              required: true
+            - name: emphasis
+              schema:
+                $ref: '#/components/schemas/EmphasisType'
+              required: true
+          returns:
+            schema:
+              $ref: '#/components/schemas/PygameSurface'
+          description: Renders text with appropriate color and font formatting for pygame
+
+        reset_emphasis:
+          parameters:
+            - name: entity_id
+              schema:
+                type: string
+              required: true
+          returns:
+            schema:
+              type: "null"
+          description: Resets all emphasis states for given entity to default

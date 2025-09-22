@@ -11,6 +11,13 @@ from . import GameState, Position, Direction, GameStatus
 from .layout_constraint_manager import LayoutConstraintManager, LayoutConstraintViolation
 from .event_processing_engine import EventProcessingEngine, EventPriority
 
+# GUI Enhancement imports
+try:
+    from .gui_enhancement import StatusChangeTracker, StageNameResolver, DisplayStateManager
+    GUI_ENHANCEMENT_AVAILABLE = True
+except ImportError:
+    GUI_ENHANCEMENT_AVAILABLE = False
+
 # pygame のインポート（オプショナル）
 try:
     import pygame
@@ -330,6 +337,42 @@ class GuiRenderer(Renderer):
         
         # 実行制御コールバック
         self.execution_controller = None
+
+        # GUI Enhancement Features (v1.2.11)
+        if GUI_ENHANCEMENT_AVAILABLE:
+            self.status_tracker = StatusChangeTracker()
+            self.stage_resolver = StageNameResolver()
+            self.display_manager = DisplayStateManager()
+            self.current_stage_name = "Stage: unknown"  # Fallback
+            self.previous_entity_statuses = {}  # Track entity statuses
+            self.last_game_state_hash = None  # For turn boundary detection
+            self.pending_turn_advance = False  # Flag to advance turn on next frame
+            self.current_action_changes = {}
+            self.previous_execution_paused = False
+            # Action boundary detection using game state hash
+            self.previous_game_state_hash = None
+            self.stable_state_count = 0  # Count consecutive same states
+            self.max_stable_count = 3  # Clear after 3 stable frames
+            # Turn boundary detection for highlighting management
+            self.previous_execution_paused_for_turn = False
+            self.action_completed = False
+        else:
+            self.status_tracker = None
+            self.stage_resolver = None
+            self.display_manager = None
+            self.current_stage_name = "Stage: stage01"  # Fallback to hardcoded
+            self.previous_entity_statuses = {}
+            self.last_game_state_hash = None
+            self.pending_turn_advance = False
+            self.current_action_changes = {}
+            self.previous_execution_paused = False
+            # Action boundary detection using game state hash
+            self.previous_game_state_hash = None
+            self.stable_state_count = 0  # Count consecutive same states
+            self.max_stable_count = 3  # Clear after 3 stable frames
+            # Turn boundary detection for highlighting management
+            self.previous_execution_paused_for_turn = False
+            self.action_completed = False
         self.button_rects = {}  # ボタン矩形管理
         
         # 🚀 v1.2.5: 7段階速度制御システム
@@ -417,15 +460,93 @@ class GuiRenderer(Renderer):
         print(f"🖥️ pygame version: {pygame.version.ver}")
         print(f"🎮 ウィンドウハンドル: {pygame.display.get_surface() is not None}")
         print(f"🔧 レイアウト制約管理初期化完了")
+
+        # GUI Enhancement: Initialize dynamic stage name from main file (v1.2.11)
+        import sys
+        sys.stdout.flush()  # Force output immediately
+        print(f"🔧 GUI Enhancement初期化中... (available: {GUI_ENHANCEMENT_AVAILABLE})", flush=True)
+        print(f"🔧 Status Tracker: {getattr(self, 'status_tracker', None)}", flush=True)
+        print(f"🔧 Stage Resolver: {getattr(self, 'stage_resolver', None)}", flush=True)
+        print(f"🔧 Display Manager: {getattr(self, 'display_manager', None)}", flush=True)
+        if GUI_ENHANCEMENT_AVAILABLE and self.stage_resolver:
+            try:
+                # Try to find and resolve stage name from main_*.py files
+                import glob
+                import os
+                main_files = glob.glob("main_*.py")
+                print(f"🔍 検索されたmain_*.pyファイル: {main_files[:5]}...")  # Show first 5 files
+
+                # Try to detect the currently executing main file
+                current_main_file = None
+                try:
+                    # Get the main module filename
+                    import __main__
+                    if hasattr(__main__, '__file__') and __main__.__file__:
+                        current_main_file = os.path.basename(__main__.__file__)
+                        print(f"🔍 実行中のメインファイル検出: {current_main_file}")
+
+                    # Also try to get from command line arguments
+                    import sys
+                    if len(sys.argv) > 0:
+                        script_name = os.path.basename(sys.argv[0])
+                        if script_name.startswith('main_') and script_name.endswith('.py'):
+                            current_main_file = script_name
+                            print(f"🔍 コマンドライン引数から検出: {current_main_file}")
+                except Exception as e:
+                    print(f"⚠️ メインファイル検出エラー: {e}")
+
+                # Choose the appropriate main file
+                target_file = None
+                if current_main_file and current_main_file in main_files:
+                    target_file = current_main_file
+                    print(f"🎯 実行中のファイルを使用: {target_file}")
+                else:
+                    # Try to find a main file based on the current stage
+                    # Look for files in process-related information or fall back to alphabetical
+                    stage_pattern_files = [f for f in main_files if 'stage09' in f or 'stage9' in f]
+                    if stage_pattern_files:
+                        target_file = stage_pattern_files[0]
+                        print(f"🎯 ステージパターンマッチで使用: {target_file}")
+                    elif main_files:
+                        # Sort files to get a consistent order (prefer stage numbers)
+                        sorted_files = sorted(main_files, key=lambda x: (
+                            not x.startswith('main_stage'),  # Prefer main_stage* files
+                            x  # Then alphabetical
+                        ))
+                        target_file = sorted_files[0]
+                        print(f"🔍 ソート済み最初のファイルを使用: {target_file}")
+
+                if target_file:
+                    print(f"🔍 動的ステージ名解決中: {target_file}")
+                    result_name = self.resolve_stage_name_from_file(target_file)
+                    print(f"✅ ステージ名解決完了: {result_name} -> current: {self.current_stage_name}")
+                else:
+                    print("⚠️ main_*.py ファイルが見つかりません。デフォルトステージ名を使用します。")
+                    self.current_stage_name = "Stage: unknown"
+            except Exception as e:
+                print(f"⚠️ 動的ステージ名解決エラー: {e}")
+                import traceback
+                traceback.print_exc()
+                self.current_stage_name = "Stage: unknown"
+        else:
+            print(f"⚠️ GUI Enhancement無効: available={GUI_ENHANCEMENT_AVAILABLE}, stage_resolver={getattr(self, 'stage_resolver', None)}")
+            self.current_stage_name = "Stage: fallback"
     
     def render_frame(self, game_state: GameState) -> None:
         """ゲーム状態をGUI画面に描画"""
         if not self.screen:
             return
-        
+
+        # GUI Enhancement: Turn boundary detection and management (v1.2.11)
+        if GUI_ENHANCEMENT_AVAILABLE and self.status_tracker:
+            self._manage_turn_boundaries(game_state)
+
+        # GUI Enhancement: Update entity status tracking (v1.2.11)
+        self.update_entity_status_tracking(game_state)
+
         # 背景をクリア
         self.screen.fill(self.colors['background'])
-        
+
         # ゲームエリアの描画
         self._draw_game_area(game_state)
         
@@ -671,8 +792,8 @@ class GuiRenderer(Renderer):
         sidebar_x = self.margin  # 左側に配置
         sidebar_y = self.margin + self.control_panel_height + self.margin  # ゲームエリアと同じY座標
         
-        # ステージ情報を左上に表示
-        stage_info_text = "Stage: stage01"  # ステージファイル名
+        # ステージ情報を左上に表示（v1.2.11 動的表示対応）
+        stage_info_text = self.current_stage_name
         stage_info_surface = self.small_font.render(stage_info_text, True, self.colors['text'])
         self.screen.blit(stage_info_surface, (self.margin, self.margin + 5))
         
@@ -691,16 +812,133 @@ class GuiRenderer(Renderer):
         self._draw_text("Player Info", sidebar_x + 10, y_offset, self.font)
         y_offset += 30
         
-        player_info = [
+        # Basic info without status tracking
+        basic_info = [
             f"Pos: ({game_state.player.position.x}, {game_state.player.position.y})",
-            f"Dir: {game_state.player.direction.value}",
-            f"HP: {game_state.player.hp}/{game_state.player.max_hp}",
-            f"ATK: {game_state.player.attack_power}"
+            f"Dir: {game_state.player.direction.value}"
         ]
-        
-        for info in player_info:
+
+        for info in basic_info:
             self._draw_text(info, sidebar_x + 20, y_offset, self.small_font)
             y_offset += 20
+
+        # Status info with GUI Enhancement highlighting (v1.2.11)
+        if GUI_ENHANCEMENT_AVAILABLE and self.status_tracker and self.display_manager:
+            # HP with change highlighting - separated format
+            # Show highlighting if there are persistent changes from recent actions
+            should_highlight = self.status_tracker.has_changes("player")
+
+            if should_highlight:
+                hp_change = self.status_tracker.get_change_delta("player", "hp")
+
+                # Only show HP highlighting if HP actually changed
+                if hp_change != 0:
+                    # Determine color based on change direction
+                    if hp_change < 0:
+                        highlight_color = (255, 0, 0)  # Red for decrease
+                        change_symbol = self.display_manager.text_config.decrease_symbol
+                    else:
+                        highlight_color = (0, 255, 0)  # Green for increase
+                        change_symbol = self.display_manager.text_config.increase_symbol
+
+                    font = self.font  # Use bold font for highlighting
+
+                    # Split display: "HP: 90/100 (-10)" -> "HP: " + "90" + "/100 " + "(-10)"
+                    base_text = f"HP: "
+                    value_text = str(game_state.player.hp)
+                    suffix_text = f"/{game_state.player.max_hp} "
+                    change_text = f"({change_symbol}{abs(hp_change)})"
+
+                    # Draw base text in default color
+                    base_surface = font.render(base_text, True, self.colors['text'])
+                    self.screen.blit(base_surface, (sidebar_x + 20, y_offset))
+                    x_offset = sidebar_x + 20 + base_surface.get_width()
+
+                    # Draw value in highlight color
+                    value_surface = font.render(value_text, True, highlight_color)
+                    self.screen.blit(value_surface, (x_offset, y_offset))
+                    x_offset += value_surface.get_width()
+
+                    # Draw suffix in default color
+                    suffix_surface = font.render(suffix_text, True, self.colors['text'])
+                    self.screen.blit(suffix_surface, (x_offset, y_offset))
+                    x_offset += suffix_surface.get_width()
+
+                    # Draw change in highlight color
+                    change_surface = font.render(change_text, True, highlight_color)
+                    self.screen.blit(change_surface, (x_offset, y_offset))
+
+                    y_offset += base_surface.get_height() + 2
+                else:
+                    # Player has changes but not HP - show default HP
+                    self._draw_text(f"HP: {game_state.player.hp}/{game_state.player.max_hp}", sidebar_x + 20, y_offset, self.small_font)
+                    y_offset += 20
+            else:
+                # No changes - show default HP
+                self._draw_text(f"HP: {game_state.player.hp}/{game_state.player.max_hp}", sidebar_x + 20, y_offset, self.small_font)
+                y_offset += 20
+
+            # Attack with change highlighting - separated format
+            # Use the same highlighting logic as HP
+            if should_highlight:
+                attack_change = self.status_tracker.get_change_delta("player", "attack")
+
+                # Only show ATK highlighting if ATK actually changed
+                if attack_change != 0:
+                    # Determine color based on change direction
+                    if attack_change < 0:
+                        highlight_color = (255, 0, 0)  # Red for decrease
+                        change_symbol = self.display_manager.text_config.decrease_symbol
+                    else:
+                        highlight_color = (0, 255, 0)  # Green for increase
+                        change_symbol = self.display_manager.text_config.increase_symbol
+
+                    font = self.font  # Use bold font for highlighting
+
+                    # Split display: "ATK: 25 (+5)" -> "ATK: " + "25" + " " + "(+5)"
+                    base_text = f"ATK: "
+                    value_text = str(game_state.player.attack_power)
+                    space_text = " "
+                    change_text = f"({change_symbol}{abs(attack_change)})"
+
+                    # Draw base text in default color
+                    base_surface = font.render(base_text, True, self.colors['text'])
+                    self.screen.blit(base_surface, (sidebar_x + 20, y_offset))
+                    x_offset = sidebar_x + 20 + base_surface.get_width()
+
+                    # Draw value in highlight color
+                    value_surface = font.render(value_text, True, highlight_color)
+                    self.screen.blit(value_surface, (x_offset, y_offset))
+                    x_offset += value_surface.get_width()
+
+                    # Draw space in default color
+                    space_surface = font.render(space_text, True, self.colors['text'])
+                    self.screen.blit(space_surface, (x_offset, y_offset))
+                    x_offset += space_surface.get_width()
+
+                    # Draw change in highlight color
+                    change_surface = font.render(change_text, True, highlight_color)
+                    self.screen.blit(change_surface, (x_offset, y_offset))
+
+                    y_offset += base_surface.get_height() + 2
+                else:
+                    # Player has changes but not ATK - show default ATK
+                    self._draw_text(f"ATK: {game_state.player.attack_power}", sidebar_x + 20, y_offset, self.small_font)
+                    y_offset += 20
+            else:
+                # No changes - show default ATK
+                self._draw_text(f"ATK: {game_state.player.attack_power}", sidebar_x + 20, y_offset, self.small_font)
+                y_offset += 20
+        else:
+            # Fallback without highlighting
+            player_status_info = [
+                f"HP: {game_state.player.hp}/{game_state.player.max_hp}",
+                f"ATK: {game_state.player.attack_power}"
+            ]
+
+            for info in player_status_info:
+                self._draw_text(info, sidebar_x + 20, y_offset, self.small_font)
+                y_offset += 20
         
         y_offset += 20
         
@@ -717,10 +955,15 @@ class GuiRenderer(Renderer):
                 enemy_info = [
                     f"Enemy {display_index}: {enemy.enemy_type.value}",
                     f"Pos: ({enemy.position.x}, {enemy.position.y})",
-                    f"Dir: {enemy.direction.value}",
-                    f"HP: {enemy.hp}/{enemy.max_hp}",
-                    f"ATK: {enemy.attack_power}"
+                    f"Dir: {enemy.direction.value}"
                 ]
+
+                # GUI Enhancement: Enemy status with highlighting (v1.2.11)
+                # Use position-based ID to maintain consistency even when enemy list changes
+                enemy_id = f"enemy_{enemy.position.x}_{enemy.position.y}"
+                # HP and ATK will be rendered with GUI Enhancement if available
+                # Basic enemy info (without HP/ATK) for all modes
+                pass  # HP/ATK handled separately below
                 
                 # 敵モード情報追加
                 if hasattr(enemy, 'enemy_mode'):
@@ -733,9 +976,123 @@ class GuiRenderer(Renderer):
                             hp_ratio = enemy.hp / enemy.max_hp
                             enemy_info.append(f"Rage: {hp_ratio:.0%} HP")
                 
+                # Draw basic enemy info (excluding HP/ATK which are handled separately)
                 for info in enemy_info:
                     self._draw_text(info, sidebar_x + 20, y_offset, self.small_font)
                     y_offset += 18
+
+                # Draw HP and ATK with unified highlighting logic
+                if GUI_ENHANCEMENT_AVAILABLE and self.status_tracker and self.display_manager:
+                    # Show highlighting if there are persistent changes from recent actions
+                    enemy_should_highlight = self.status_tracker.has_changes(enemy_id)
+
+                    if enemy_should_highlight:
+                        hp_change = self.status_tracker.get_change_delta(enemy_id, "hp")
+
+                        # Only show HP highlighting if HP actually changed
+                        if hp_change != 0:
+                            # Determine color based on change direction
+                            if hp_change < 0:
+                                highlight_color = (255, 0, 0)  # Red for decrease
+                                change_symbol = self.display_manager.text_config.decrease_symbol
+                            else:
+                                highlight_color = (0, 255, 0)  # Green for increase
+                                change_symbol = self.display_manager.text_config.increase_symbol
+
+                            font = self.font  # Use bold font for highlighting
+
+                            # Split display: "HP: 90/100 (-10)" -> "HP: " + "90" + "/100 " + "(-10)"
+                            base_text = f"HP: "
+                            value_text = str(enemy.hp)
+                            suffix_text = f"/{enemy.max_hp} "
+                            change_text = f"({change_symbol}{abs(hp_change)})"
+
+                            # Draw base text in default color
+                            base_surface = font.render(base_text, True, self.colors['text'])
+                            self.screen.blit(base_surface, (sidebar_x + 20, y_offset))
+                            x_offset = sidebar_x + 20 + base_surface.get_width()
+
+                            # Draw value in highlight color
+                            value_surface = font.render(value_text, True, highlight_color)
+                            self.screen.blit(value_surface, (x_offset, y_offset))
+                            x_offset += value_surface.get_width()
+
+                            # Draw suffix in default color
+                            suffix_surface = font.render(suffix_text, True, self.colors['text'])
+                            self.screen.blit(suffix_surface, (x_offset, y_offset))
+                            x_offset += suffix_surface.get_width()
+
+                            # Draw change in highlight color
+                            change_surface = font.render(change_text, True, highlight_color)
+                            self.screen.blit(change_surface, (x_offset, y_offset))
+
+                            y_offset += base_surface.get_height() + 2
+                        else:
+                            # Enemy has changes but not HP - show default HP
+                            self._draw_text(f"HP: {enemy.hp}/{enemy.max_hp}", sidebar_x + 20, y_offset, self.small_font)
+                            y_offset += 18
+                    else:
+                        # No changes - show default HP
+                        self._draw_text(f"HP: {enemy.hp}/{enemy.max_hp}", sidebar_x + 20, y_offset, self.small_font)
+                        y_offset += 18
+
+                    # ATK with highlighting using same logic as HP
+                    if enemy_should_highlight:
+                        attack_change = self.status_tracker.get_change_delta(enemy_id, "attack")
+
+                        # Only show ATK highlighting if ATK actually changed
+                        if attack_change != 0:
+                            # Determine color based on change direction
+                            if attack_change < 0:
+                                highlight_color = (255, 0, 0)  # Red for decrease
+                                change_symbol = self.display_manager.text_config.decrease_symbol
+                            else:
+                                highlight_color = (0, 255, 0)  # Green for increase
+                                change_symbol = self.display_manager.text_config.increase_symbol
+
+                            font = self.font  # Use bold font for highlighting
+
+                            # Split display: "ATK: 25 (+5)" -> "ATK: " + "25" + " " + "(+5)"
+                            base_text = f"ATK: "
+                            value_text = str(enemy.attack_power)
+                            space_text = " "
+                            change_text = f"({change_symbol}{abs(attack_change)})"
+
+                            # Draw base text in default color
+                            base_surface = font.render(base_text, True, self.colors['text'])
+                            self.screen.blit(base_surface, (sidebar_x + 20, y_offset))
+                            x_offset = sidebar_x + 20 + base_surface.get_width()
+
+                            # Draw value in highlight color
+                            value_surface = font.render(value_text, True, highlight_color)
+                            self.screen.blit(value_surface, (x_offset, y_offset))
+                            x_offset += value_surface.get_width()
+
+                            # Draw space in default color
+                            space_surface = font.render(space_text, True, self.colors['text'])
+                            self.screen.blit(space_surface, (x_offset, y_offset))
+                            x_offset += space_surface.get_width()
+
+                            # Draw change in highlight color
+                            change_surface = font.render(change_text, True, highlight_color)
+                            self.screen.blit(change_surface, (x_offset, y_offset))
+
+                            y_offset += base_surface.get_height() + 2
+                        else:
+                            # Enemy has changes but not ATK - show default ATK
+                            self._draw_text(f"ATK: {enemy.attack_power}", sidebar_x + 20, y_offset, self.small_font)
+                            y_offset += 18
+                    else:
+                        # No changes - show default ATK
+                        self._draw_text(f"ATK: {enemy.attack_power}", sidebar_x + 20, y_offset, self.small_font)
+                        y_offset += 18
+                else:
+                    # Fallback without highlighting - draw standard HP/ATK
+                    self._draw_text(f"HP: {enemy.hp}/{enemy.max_hp}", sidebar_x + 20, y_offset, self.small_font)
+                    y_offset += 18
+                    self._draw_text(f"ATK: {enemy.attack_power}", sidebar_x + 20, y_offset, self.small_font)
+                    y_offset += 18
+
                 y_offset += 5  # 敵間のスペース
         else:
             self._draw_text("No enemies alive", sidebar_x + 20, y_offset, self.small_font)
@@ -883,6 +1240,30 @@ class GuiRenderer(Renderer):
         if self.screen:
             pygame.display.flip()
             self.clock.tick(60)  # 60 FPS
+
+    def _compute_game_state_hash(self, game_state: GameState) -> str:
+        """
+        Compute a hash of the current game state for action boundary detection.
+        """
+        # Create a simple hash based on key game state components
+        hash_components = []
+
+        # Player state
+        hash_components.append(f"player_{game_state.player.position.x}_{game_state.player.position.y}")
+        hash_components.append(f"player_hp_{game_state.player.hp}")
+        hash_components.append(f"player_att_{game_state.player.attack_power}")
+
+        # Enemy states
+        for enemy in game_state.enemies:
+            hash_components.append(f"enemy_{enemy.position.x}_{enemy.position.y}_hp_{enemy.hp}")
+
+        # Game status (if available)
+        if hasattr(game_state, 'mode'):
+            hash_components.append(f"mode_{game_state.mode}")
+        if hasattr(game_state, 'status'):
+            hash_components.append(f"status_{game_state.status}")
+
+        return "|".join(sorted(hash_components))
     
     def render_complete_view(self, game_state: GameState, show_legend: bool = True) -> None:
         """完全なビューを描画"""
@@ -1418,10 +1799,29 @@ class GuiRenderer(Renderer):
                     print("⚠️ 完全システムリセット部分的失敗")
                     for error in reset_result.errors:
                         print(f"❌ {error}")
+
+                # GUI Enhancement: Reset status tracker (v1.2.11)
+                if GUI_ENHANCEMENT_AVAILABLE and self.status_tracker:
+                    # Clear all tracking state to prevent highlighting after reset
+                    self.status_tracker.previous_states.clear()
+                    self.status_tracker.last_changes.clear()
+                    self.status_tracker.persistent_changes.clear()
+                    self.status_tracker.entity_turn_stamps.clear()
+                    self.status_tracker.turn_counter = 0
+                    print("✅ GUI Enhancement status tracker reset")
             else:
                 # フォールバック：従来のリセット処理
                 print("⚠️ 新しいリセット機能が利用できません - 従来の方式を使用")
                 self._handle_reset_request()
+
+                # GUI Enhancement: Reset status tracker for fallback case (v1.2.11)
+                if GUI_ENHANCEMENT_AVAILABLE and self.status_tracker:
+                    self.status_tracker.previous_states.clear()
+                    self.status_tracker.last_changes.clear()
+                    self.status_tracker.persistent_changes.clear()
+                    self.status_tracker.entity_turn_stamps.clear()
+                    self.status_tracker.turn_counter = 0
+                    print("✅ GUI Enhancement status tracker reset (fallback)")
             
             # NFR-001.3: 200ms以内のリセット完了時間検証
             reset_time_ms = (datetime.now() - start_time).total_seconds() * 1000
@@ -1589,6 +1989,267 @@ class GuiRenderer(Renderer):
                             # 範囲攻撃枠線
                             range_rect = pygame.Rect(cell_x, cell_y, self.cell_size, self.cell_size)
                             pygame.draw.rect(self.screen, (255, 165, 0), range_rect, 2)
+
+    # ========================
+    # GUI Enhancement Methods (v1.2.11)
+    # ========================
+
+    def resolve_stage_name_from_file(self, main_file_path: str) -> str:
+        """
+        Resolve stage name from main_*.py file using StageNameResolver.
+
+        Args:
+            main_file_path: Path to main_*.py file
+
+        Returns:
+            Resolved stage name or fallback
+        """
+        if not GUI_ENHANCEMENT_AVAILABLE or not self.stage_resolver:
+            return "Stage: stage01"
+
+        try:
+            resolution = self.stage_resolver.resolve_stage_name(main_file_path)
+            self.current_stage_name = resolution.resolved_name
+            return self.current_stage_name
+        except Exception as e:
+            # Fallback on error
+            self.current_stage_name = "Stage: unknown_stage"
+            return self.current_stage_name
+
+    def _manage_turn_boundaries(self, game_state: GameState) -> None:
+        """
+        Manage turn boundaries for status change highlighting.
+        Detects when game state changes occur and advances turns appropriately.
+
+        Args:
+            game_state: Current game state
+        """
+        if not GUI_ENHANCEMENT_AVAILABLE or not self.status_tracker:
+            return
+
+        # Check if we're in step execution pause mode - if so, don't advance turns
+        if self._is_in_step_execution_pause():
+            # During step execution pause, maintain highlighting for learning visibility
+            # Don't advance turns or clear highlighting
+            return
+
+        # Handle pending turn advance from previous frame
+        if self.pending_turn_advance:
+            self.status_tracker.advance_turn()
+            self.pending_turn_advance = False
+            print(f"🔄 Turn advanced to: {self.status_tracker.get_current_turn()}", flush=True)
+
+        # Create a hash of important game state elements
+        current_hash = self._create_game_state_hash(game_state)
+
+        # Detect significant changes that indicate a turn boundary
+        if self.last_game_state_hash and current_hash != self.last_game_state_hash:
+            # Significant change detected - schedule turn advance for next frame
+            # This allows the current frame to display the highlighting before advancing
+            self.pending_turn_advance = True
+            print(f"🎯 Turn boundary detected, scheduling advance for next frame", flush=True)
+
+        self.last_game_state_hash = current_hash
+
+    def _is_in_step_execution_pause(self) -> bool:
+        """
+        Check if we're currently in step execution pause mode.
+        During step execution pauses, status highlighting should persist for learning visibility.
+
+        Returns:
+            True if in step execution pause mode, False otherwise
+        """
+        if not self.execution_controller:
+            return False
+
+        try:
+            from engine import ExecutionMode
+            execution_mode = self.execution_controller.state.mode
+
+            # Only consider PAUSED mode as a true pause for highlighting persistence
+            # STEPPING and STEP_EXECUTING are active execution states where clearing should occur
+            is_paused = execution_mode == ExecutionMode.PAUSED
+
+            return is_paused
+
+        except Exception as e:
+            print(f"⚠️ Error checking execution mode: {e}", flush=True)
+            return False
+
+    def _create_game_state_hash(self, game_state: GameState) -> str:
+        """
+        Create a hash of the important game state elements for turn boundary detection.
+
+        Args:
+            game_state: Current game state
+
+        Returns:
+            Hash string representing the current game state
+        """
+        import hashlib
+
+        # Collect important state information
+        state_data = []
+
+        # Player state - only track position (actions change position)
+        player = game_state.player
+        state_data.append(f"player_pos:{player.position.x},{player.position.y}")
+
+        # Enemy states - only track positions (HP changes are handled separately)
+        for i, enemy in enumerate(game_state.enemies):
+            if enemy.is_alive():
+                state_data.append(f"enemy_{i}_pos:{enemy.position.x},{enemy.position.y}")
+
+        # Game status
+        state_data.append(f"status:{game_state.status.value}")
+
+        # Action counter (to detect new actions even without position changes)
+        if hasattr(self, '_action_counter'):
+            state_data.append(f"action_count:{self._action_counter}")
+        else:
+            state_data.append(f"action_count:0")
+
+        # Create hash
+        state_string = "|".join(state_data)
+        return hashlib.md5(state_string.encode()).hexdigest()
+
+    def update_entity_status_tracking(self, game_state: GameState) -> None:
+        """
+        Update status tracking for all entities in the game state.
+
+        Args:
+            game_state: Current game state with entity information
+        """
+        if not GUI_ENHANCEMENT_AVAILABLE or not self.status_tracker:
+            return
+
+        # Game state hash-based action boundary detection
+        current_hash = self._compute_game_state_hash(game_state)
+
+        # Check if we're in step execution pause (learning visibility mode)
+        in_step_pause = self._is_in_step_execution_pause()
+
+        # Track player status first - only track values that can change
+        player_status = {
+            "hp": game_state.player.hp,
+            "attack": game_state.player.attack_power
+        }
+        player_result = self.status_tracker.track_changes("player", player_status)
+
+        # NEW APPROACH: Detect turn boundaries based on game state changes, not execution pause states
+        # Since execution modes don't provide reliable turn boundaries, use state hash changes
+        state_changed = (self.previous_game_state_hash is not None and
+                        current_hash != self.previous_game_state_hash)
+
+
+        # Detect action boundaries based on state changes
+        if self.previous_game_state_hash is None:
+            # First run - initialize
+            self.previous_game_state_hash = current_hash
+            self.stable_state_count = 0
+        elif current_hash == self.previous_game_state_hash:
+            # Same state - only increment stable count if NOT in step pause
+            # This ensures highlighting persists during step execution pauses for learning visibility
+            if not in_step_pause:
+                self.stable_state_count += 1
+            # During step pause, maintain the current stable count
+        else:
+            # State changed - reset stable count
+            self.stable_state_count = 0
+            self.previous_game_state_hash = current_hash
+
+        # Store the result for rendering decisions
+        self.current_action_changes = {"player": player_result}
+
+        # Track enemy statuses with position-based IDs
+        enemy_results = {}
+        for i, enemy in enumerate(game_state.enemies):
+            # Use position-based ID to maintain consistency even when enemy list changes
+            enemy_id = f"enemy_{enemy.position.x}_{enemy.position.y}"
+            # Only track values that can change
+            enemy_status = {
+                "hp": enemy.hp,
+                "attack": getattr(enemy, 'attack_power', 0)
+            }
+            enemy_result = self.status_tracker.track_changes(enemy_id, enemy_status)
+            # Store the result for rendering decisions
+            self.current_action_changes[enemy_id] = enemy_result
+            enemy_results[enemy_id] = enemy_result
+
+        # Clear highlighting when there are persistent changes but no new changes
+        # This should happen when we're not in step pause and no entity has current changes
+        should_clear_highlighting = False
+        if not in_step_pause:
+            # Check if any entity has persistent changes but no new changes
+            entities_to_check = ["player"] + list(enemy_results.keys())
+
+            # First check if any entity has current changes
+            any_current_changes = player_result.has_any_changes
+            for entity_id in enemy_results.keys():
+                if enemy_results[entity_id].has_any_changes:
+                    any_current_changes = True
+                    break
+
+            # If no current changes but some persistent changes exist, clear highlighting
+            if not any_current_changes:
+                for entity_id in entities_to_check:
+                    if self.status_tracker.has_changes(entity_id):
+                        should_clear_highlighting = True
+                        break
+
+        if should_clear_highlighting:
+            self.status_tracker.advance_turn()
+
+    def render_status_with_highlighting(self, entity_id: str, status_key: str,
+                                      current_value: int, x: int, y: int, max_width: int = None) -> int:
+        """
+        Render status value with change highlighting.
+
+        Args:
+            entity_id: Entity identifier
+            status_key: Status key (e.g., "hp", "attack")
+            current_value: Current status value
+            x: X position for rendering
+            y: Y position for rendering
+            max_width: Maximum width for text
+
+        Returns:
+            Height of rendered text
+        """
+        if not GUI_ENHANCEMENT_AVAILABLE or not self.display_manager or not self.status_tracker:
+            # Fallback to normal rendering
+            text = str(current_value)
+            text_surface = self.small_font.render(text, True, self.colors['text'])
+            self.screen.blit(text_surface, (x, y))
+            return text_surface.get_height()
+
+        # Get change delta
+        change_delta = self.status_tracker.get_change_delta(entity_id, status_key)
+
+        # Format text with highlighting
+        formatted_text = self.display_manager.format_status_text(
+            entity_id, status_key, current_value, change_delta
+        )
+
+        # Choose font based on emphasis
+        if formatted_text.is_bold:
+            font = self.font  # Use bold font (or make one bold)
+        else:
+            font = self.small_font
+
+        # Render text with appropriate color
+        text_surface = font.render(formatted_text.content, True, formatted_text.color)
+
+        # Apply width constraint if specified
+        if max_width and text_surface.get_width() > max_width:
+            # Scale down if too wide
+            scale_factor = max_width / text_surface.get_width()
+            new_width = max_width
+            new_height = int(text_surface.get_height() * scale_factor)
+            text_surface = pygame.transform.scale(text_surface, (new_width, new_height))
+
+        self.screen.blit(text_surface, (x, y))
+        return text_surface.get_height()
 
     def cleanup(self) -> None:
         """リソースをクリーンアップ"""

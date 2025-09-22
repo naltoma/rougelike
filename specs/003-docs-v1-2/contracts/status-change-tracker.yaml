@@ -1,0 +1,97 @@
+openapi: 3.0.0
+info:
+  title: StatusChangeTracker API
+  description: API contract for tracking entity status changes in GUI display enhancement
+  version: 1.0.0
+
+components:
+  schemas:
+    EntityStatus:
+      type: object
+      additionalProperties:
+        type: integer
+      example:
+        hp: 90
+        attack: 15
+        defense: 10
+
+    ChangeResult:
+      type: object
+      properties:
+        entity_id:
+          type: string
+          description: Unique identifier for the entity
+        status_changes:
+          type: object
+          additionalProperties:
+            type: integer
+          description: Map of status key to change delta (current - previous)
+        has_any_changes:
+          type: boolean
+          description: True if any status values changed
+        emphasis_map:
+          type: object
+          additionalProperties:
+            type: string
+            enum: [default, decreased, increased]
+          description: Map of status key to emphasis type for display
+      required:
+        - entity_id
+        - status_changes
+        - has_any_changes
+        - emphasis_map
+
+  interfaces:
+    StatusChangeTracker:
+      methods:
+        track_changes:
+          parameters:
+            - name: entity_id
+              schema:
+                type: string
+              required: true
+            - name: current_status
+              schema:
+                $ref: '#/components/schemas/EntityStatus'
+              required: true
+          returns:
+            schema:
+              $ref: '#/components/schemas/ChangeResult'
+          description: Tracks changes between previous and current status values
+
+        has_changes:
+          parameters:
+            - name: entity_id
+              schema:
+                type: string
+              required: true
+          returns:
+            schema:
+              type: boolean
+          description: Returns true if entity has any status changes this turn
+
+        get_change_delta:
+          parameters:
+            - name: entity_id
+              schema:
+                type: string
+              required: true
+            - name: status_key
+              schema:
+                type: string
+              required: true
+          returns:
+            schema:
+              type: integer
+          description: Returns the change delta for specific entity status
+
+        reset_entity_tracking:
+          parameters:
+            - name: entity_id
+              schema:
+                type: string
+              required: true
+          returns:
+            schema:
+              type: "null"
+          description: Clears tracking state for specific entity
