@@ -44,13 +44,13 @@ class SolutionCodeGenerator:
             "def solve():",
             "    \"\"\"",
             "    Auto-generated solution for stage validation",
-            "    Simple step-by-step approach",
+            "    Smart item handling with is_available() logic",
             "    \"\"\"",
         ]
 
-        for i, action in enumerate(self.solution_path, 1):
-            api_call = self._action_to_api_call(action)
-            lines.append(f"    {api_call}  # Step {i}")
+        # Generate smart solution with conditional logic
+        optimized_lines = self._generate_smart_solution_lines()
+        lines.extend(optimized_lines)
 
         return "\n".join(lines)
 
@@ -162,7 +162,9 @@ class SolutionCodeGenerator:
             ActionType.TURN_RIGHT: "turn_right()",
             ActionType.ATTACK: "attack()",
             ActionType.PICKUP: "pickup()",
-            ActionType.WAIT: "wait()"
+            ActionType.WAIT: "wait()",
+            ActionType.IS_AVAILABLE: "is_available()",  # v1.2.12
+            ActionType.DISPOSE: "dispose()"  # v1.2.12
         }
         return api_mapping.get(action, f"# Unknown action: {action}")
 
@@ -174,7 +176,9 @@ class SolutionCodeGenerator:
             ActionType.TURN_RIGHT: "Turn 90 degrees clockwise",
             ActionType.ATTACK: "Attack enemy in front",
             ActionType.PICKUP: "Pick up item at current position",
-            ActionType.WAIT: "Wait for one turn"
+            ActionType.WAIT: "Wait for one turn",
+            ActionType.IS_AVAILABLE: "Check if item available without consuming turn",  # v1.2.12
+            ActionType.DISPOSE: "Dispose item at current position"  # v1.2.12
         }
         return explanations.get(action, f"Perform {action.value}")
 
@@ -232,3 +236,75 @@ class SolutionCodeGenerator:
             return 1.0
 
         return len(self.solution_path) / manhattan_dist
+
+    def _generate_smart_solution_lines(self) -> List[str]:
+        """Generate solution lines with smart item handling logic (API constraint aware)"""
+        lines = []
+
+        # Check available APIs for conditional logic
+        allowed_apis = self.stage.constraints.allowed_apis
+        has_is_available = "is_available" in allowed_apis
+        has_dispose = "dispose" in allowed_apis
+
+        # Track if we need item handling logic
+        solution_has_dispose = ActionType.DISPOSE in self.solution_path
+        solution_has_pickup = ActionType.PICKUP in self.solution_path
+
+        if solution_has_dispose and solution_has_pickup and has_is_available and has_dispose:
+            # Generate conditional item handling only if APIs are available
+            lines.extend(self._generate_conditional_item_handling())
+        else:
+            # Generate simple step-by-step solution respecting API constraints
+            for i, action in enumerate(self.solution_path, 1):
+                if action == ActionType.DISPOSE and has_dispose:
+                    if has_is_available:
+                        lines.append("    # Smart item disposal")
+                        lines.append("    if is_available():")
+                        lines.append("        pickup()   # Beneficial item")
+                        lines.append("    else:")
+                        lines.append("        dispose()  # Dangerous bomb")
+                    else:
+                        lines.append(f"    dispose()  # Step {i}")
+                elif action == ActionType.PICKUP:
+                    if has_is_available and has_dispose:
+                        lines.append("    # Smart item pickup")
+                        lines.append("    if is_available():")
+                        lines.append("        pickup()   # Beneficial item")
+                        lines.append("    else:")
+                        lines.append("        dispose()  # Dangerous bomb")
+                    else:
+                        lines.append(f"    pickup()  # Step {i}")
+                else:
+                    api_call = self._action_to_api_call(action)
+                    lines.append(f"    {api_call}  # Step {i}")
+
+        return lines
+
+    def _generate_conditional_item_handling(self) -> List[str]:
+        """Generate solution with conditional item handling logic (API constraint aware)"""
+        lines = []
+        step_num = 1
+
+        # Check available APIs
+        allowed_apis = self.stage.constraints.allowed_apis
+        has_is_available = "is_available" in allowed_apis
+        has_dispose = "dispose" in allowed_apis
+
+        for action in self.solution_path:
+            if action in [ActionType.DISPOSE, ActionType.PICKUP]:
+                if has_is_available and has_dispose:
+                    lines.append(f"    # Step {step_num}: Smart item handling with is_available()")
+                    lines.append("    if is_available():")
+                    lines.append("        pickup()   # Beneficial item - safe to collect")
+                    lines.append("    else:")
+                    lines.append("        dispose()  # Dangerous item (bomb) - dispose safely")
+                else:
+                    # Fall back to simple API call if advanced APIs not available
+                    api_call = self._action_to_api_call(action)
+                    lines.append(f"    {api_call}  # Step {step_num}")
+            else:
+                api_call = self._action_to_api_call(action)
+                lines.append(f"    {api_call}  # Step {step_num}")
+            step_num += 1
+
+        return lines

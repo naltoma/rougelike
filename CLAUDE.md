@@ -29,7 +29,9 @@ Kiro-style Spec Driven Development implementation using claude code slash comman
 - `pickup-wait-system-v1.2.7`: wait()API導入・敵AI視覚システム・ステージ毎プレイヤー設定・stage07-10実装（v1.2.7で完了） - 詳細は [docs/v1.2.7.md](docs/v1.2.7.md) 参照
 - `special-conditional-stages-v1.2.8`: 特殊条件付きステージ（Stage11-13）・大型敵システム・特殊敵システム実装（v1.2.8で完了） - 詳細は [docs/v1.2.8.md](docs/v1.2.8.md) 参照
 - `random-stage-generation-v1.2.9`: ランダムステージ生成システム - 5種類のステージタイプ（move, attack, pickup, patrol, special）の自動生成・検証機能（v1.2.9で完了） - 詳細は [docs/v1.2.9.md](docs/v1.2.9.md) 参照
-- `see-tutorial-documentation-v1.2.10`: see()関数チュートリアルドキュメント作成 - プログラミング初心者向けの段階的学習教材、stage01完全攻略手順
+- `see-tutorial-documentation-v1.2.10`: see()関数チュートリアルドキュメント作成 - プログラミング初心者向けの段階的学習教材、stage01完全攻略手順（v1.2.10で完了） - 詳細は [docs/v1.2.10.md](docs/v1.2.10.md) 参照
+- `gui-enhancement-v1.2.11`: 動的ステージ名表示・ステータス変化強調表示システム（v1.2.11で完了） - 詳細は [docs/v1.2.11.md](docs/v1.2.11.md) 参照
+- `advanced-item-system-v1.2.12`: 不利アイテム・アイテムチェック操作・アイテム除去・ポーションHP回復・包括的ドキュメント・プロジェクト構造最適化（v1.2.12で完了） - 詳細は [docs/v1.2.12.md](docs/v1.2.12.md) 参照
 
 ## Development Guidelines
 - Think in English, but generate responses in Japanese (思考は英語、回答の生成は日本語で行うように)

@@ -8,7 +8,8 @@ import sys
 sys.path.append(str(Path(__file__).parent.parent.parent))
 from stage_generator.data_models import (
     StageConfiguration, BoardConfiguration, PlayerConfiguration,
-    GoalConfiguration, ItemConfiguration, EnemyConfiguration, ConstraintConfiguration
+    GoalConfiguration, ItemConfiguration, EnemyConfiguration, ConstraintConfiguration,
+    ALL_AVAILABLE_APIS
 )
 
 
@@ -35,8 +36,8 @@ class SpecialStageGenerator:
         items = self._generate_special_items(width, height, board['walls'], player_start, goal_position)
         enemies = self._generate_mixed_enemies(width, height, board['walls'], player_start, goal_position, items)
 
-        # Determine special mechanics for this stage
-        special_apis = self._determine_special_apis()
+        # Use all available APIs for special stages
+        special_apis = ALL_AVAILABLE_APIS
 
         # Create stage configuration
         stage_config = StageConfiguration(
@@ -70,7 +71,8 @@ class SpecialStageGenerator:
             constraints=ConstraintConfiguration(
                 max_turns=self._calculate_max_turns(width, height, len(items), len(enemies)),
                 allowed_apis=special_apis
-            )
+            ),
+            victory_conditions=self._generate_victory_conditions(items, enemies)
         )
 
         return stage_config
@@ -350,7 +352,8 @@ class SpecialStageGenerator:
                 hp=enemy_hp,
                 max_hp=enemy_hp,
                 attack_power=attack_power,
-                behavior=behavior
+                behavior=behavior,
+                vision_range=2
             )
             enemies.append(enemy)
 
@@ -381,6 +384,23 @@ class SpecialStageGenerator:
             additional_apis.append(self.random.choice(["attack", "pickup", "wait"]))
 
         return base_apis + additional_apis
+
+    def _generate_victory_conditions(self, items: List[ItemConfiguration], enemies: List[EnemyConfiguration]) -> List[dict]:
+        """Generate victory conditions based on stage content"""
+        conditions = []
+
+        # Add collect_all_items if items are present
+        if items:
+            conditions.append({"type": "collect_all_items"})
+
+        # Add defeat_all_enemies if enemies are present
+        if enemies:
+            conditions.append({"type": "defeat_all_enemies"})
+
+        # Always include reach_goal
+        conditions.append({"type": "reach_goal"})
+
+        return conditions
 
     def _random_direction(self) -> str:
         """Generate random direction"""

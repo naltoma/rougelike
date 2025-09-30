@@ -242,9 +242,20 @@ class StageLoader:
             
             # タイプの検証
             item_type = item_data["type"]
-            valid_types = ["weapon", "armor", "key", "potion", "coin", "gem", "scroll"]
+            valid_types = ["weapon", "armor", "key", "potion", "coin", "gem", "scroll", "bomb"]  # v1.2.12: bomb追加
             if item_type not in valid_types:
                 raise StageValidationError(f"items[{i}].typeは {valid_types} のいずれかである必要があります: {item_type}")
+
+            # ボムアイテムのdamage属性検証 (v1.2.12)
+            if item_type == "bomb":
+                if "damage" not in item_data:
+                    raise StageValidationError(f"items[{i}]はbombタイプですが、damage属性が必要です")
+                damage = item_data["damage"]
+                if not isinstance(damage, int) or damage <= 0:
+                    raise StageValidationError(f"items[{i}].damageは正の整数である必要があります: {damage}")
+            elif "damage" in item_data:
+                # bomb以外のアイテムにdamage属性があるのは不正
+                raise StageValidationError(f"items[{i}]は{item_type}タイプですが、damage属性は許可されていません")
     
     def _validate_constraints(self, constraints_data: Dict[str, Any]) -> None:
         """制約データの検証"""
@@ -263,7 +274,7 @@ class StageLoader:
             if not isinstance(allowed_apis, list):
                 raise StageValidationError("constraints.allowed_apisはリスト形式である必要があります")
             
-            valid_apis = ["turn_left", "turn_right", "move", "attack", "pickup", "wait", "see", "get_stage_info"]
+            valid_apis = ["turn_left", "turn_right", "move", "attack", "pickup", "wait", "see", "get_stage_info", "dispose", "is_available"]  # v1.2.12: bomb management APIs
             for api in allowed_apis:
                 if api not in valid_apis:
                     raise StageValidationError(f"無効なAPI: {api}. 有効なAPI: {valid_apis}")
@@ -402,7 +413,32 @@ class StageLoader:
         items = []
         if "items" in data:
             for item_data in data["items"]:
-                items.append(item_data)  # 辞書のまま保持（後でItemオブジェクトに変換）
+                # ItemTypeへの変換
+                item_type_str = item_data["type"]
+                item_type_map = {
+                    "weapon": ItemType.WEAPON,
+                    "armor": ItemType.ARMOR,
+                    "key": ItemType.KEY,
+                    "potion": ItemType.POTION,
+                    "coin": ItemType.COIN,
+                    "gem": ItemType.GEM,
+                    "scroll": ItemType.SCROLL,
+                    "bomb": ItemType.BOMB  # v1.2.12
+                }
+                item_type = item_type_map[item_type_str]
+
+                # Itemオブジェクトの作成
+                item = Item(
+                    id=item_data["id"],
+                    item_type=item_type,
+                    position=Position(*item_data["position"]),
+                    name=item_data.get("name", item_data["id"]),
+                    value=item_data.get("value", 0),  # アイテムの値（ポーション回復量等）
+                    damage=item_data.get("damage"),  # v1.2.12: bomb用のdamage属性
+                    effect=item_data.get("effect", {}),  # アイテム効果
+                    auto_equip=item_data.get("auto_equip", False)  # 自動装備フラグ
+                )
+                items.append(item)
         
         # 制約の抽出
         constraints = data.get("constraints", {})

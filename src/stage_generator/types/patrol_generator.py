@@ -8,7 +8,8 @@ import sys
 sys.path.append(str(Path(__file__).parent.parent.parent))
 from stage_generator.data_models import (
     StageConfiguration, BoardConfiguration, PlayerConfiguration,
-    GoalConfiguration, EnemyConfiguration, ConstraintConfiguration
+    GoalConfiguration, EnemyConfiguration, ConstraintConfiguration,
+    ALL_AVAILABLE_APIS
 )
 
 
@@ -70,12 +71,9 @@ class PatrolStageGenerator:
             items=items,
             constraints=ConstraintConfiguration(
                 max_turns=self._calculate_max_turns(width, height, len(enemies)),
-                allowed_apis=["turn_left", "turn_right", "move", "wait", "see", "attack"]
+                allowed_apis=ALL_AVAILABLE_APIS
             ),
-            victory_conditions=[
-                {"type": "defeat_all_enemies"},
-                {"type": "reach_goal"}
-            ]
+            victory_conditions=self._generate_victory_conditions(items, enemies)
         )
 
         return stage_config
@@ -361,6 +359,23 @@ class PatrolStageGenerator:
             return "N"  # Moving North
         else:
             return self._random_direction()  # Fallback
+
+    def _generate_victory_conditions(self, items: List, enemies: List[EnemyConfiguration]) -> List[dict]:
+        """Generate victory conditions based on stage content"""
+        conditions = []
+
+        # Add collect_all_items if items are present
+        if items:
+            conditions.append({"type": "collect_all_items"})
+
+        # Add defeat_all_enemies if enemies are present
+        if enemies:
+            conditions.append({"type": "defeat_all_enemies"})
+
+        # Always include reach_goal
+        conditions.append({"type": "reach_goal"})
+
+        return conditions
 
     def _random_direction(self) -> str:
         """Generate random direction"""

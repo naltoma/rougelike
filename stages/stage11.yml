@@ -1,82 +1,103 @@
 id: stage11
-title: 大型敵2x2基本ステージ
-description: 2x2サイズの大型敵と初めて戦うステージです。大型敵の移動パターンと怒り状態を観察し、基本的な戦略を学びましょう。
+title: ループ+攻撃練習ステージ
+description: ループ処理と攻撃を組み合わせて学ぶステージです。プレイヤーは北向きで開始し、右上と右下の敵を倒してから左下のゴールを目指します。道中のアイテムも全て適切に扱いながらクリアを目指してください。
 
 board:
-  size: [10, 8]
+  size: [10, 10]
   grid:
     - ".........."
-    - ".........."
-    - "....##...."
-    - "....##...."
-    - ".........."
-    - ".........."
-    - ".........."
+    - "#########."
+    - "#.......#."
+    - "#.......#."
+    - "#.......#."
+    - "#.......#."
+    - "#.......#."
+    - "#.......#."
+    - "#.......#."
     - ".........."
   legend:
     "#": "wall"
     ".": "empty"
     "P": "player"
     "G": "goal"
-    "L": "large_enemy"
-    "W": "weapon"
+    "E": "enemy"
 
 player:
   start: [0, 0]
-  direction: "E"
+  direction: "N"
   hp: 100
   max_hp: 100
-  attack_power: 20
+  attack_power: 10
 
 goal:
-  position: [9, 7]
+  position: [0, 9]
 
 enemies:
-  - id: "large_guardian"
-    type: "large_2x2"
-    position: [6, 2]  # 2x2敵なので右下座標
-    direction: "W"
-    hp: 1000  # プレイヤー攻撃力20×50回=1000
-    max_hp: 1000
-    attack_power: 1000  # 怒りモード時の即死攻撃
-    rage_threshold: 0.5  # HP50%で怒りモード
-    area_attack_range: 1  # 範囲1マス攻撃
-    behavior: "stage11_special"  # ステージ11専用行動パターン
-    stage11_special: true  # ステージ11専用の特別設定
+  - id: "enemy1"
+    position: [9, 0]    # 右上
+    type: "normal"
+    direction: "S"       # 南向き（プレイヤーが来ない方向）
+    hp: 100
+    max_hp: 100
+    attack_power: 10
+    vision_range: 2
+    behavior: "static"
+  - id: "enemy2"
+    position: [9, 9]    # 右下
+    type: "normal"
+    direction: "W"       # 西向き（プレイヤーが来ない方向）
+    hp: 350
+    max_hp: 350
+    attack_power: 10
+    vision_range: 2
+    behavior: "static"
 
-items: []
+items:
+  - id: "bomb1"
+    type: "bomb"
+    name: "爆弾"
+    position: [1, 0]
+    description: Dangerous explosive device - dispose safely!
+    damage: 20
+  - id: key_1
+    type: key
+    position: [2, 0]
+    name: 古い鍵
+    description: A valuable key to collect
+    value: 26
+  - id: "potion_1"
+    type: "potion"
+    name: "回復薬"
+    position: [9, 1]
+    description: A valuable potion to collect
+    value: 50
+  - id: "sword1"
+    type: "weapon"
+    name: "鋼の剣"
+    position: [9, 2]
+    effect:
+      attack: 35
+    auto_equip: true
+
 
 constraints:
-  max_turns: 300
-  allowed_apis: ["turn_left", "turn_right", "move", "attack", "pickup", "wait", "see"]
+  max_turns: 100
+  allowed_apis: ["turn_left", "turn_right", "move", "attack", "wait", "see", "is_available", "pickup", "dispose"]
 
 victory_conditions:
   - type: "defeat_all_enemies"
   - type: "reach_goal"
+  - type: collect_all_items
 
 # 学習目標とヒント
 learning_objectives:
-  - "2x2大型敵のサイズと占有範囲を理解する"
-  - "平常時は無害、HP50%以下で怒りモードになる仕組みを学ぶ"
-  - "50回攻撃で倒せるHP1000の概念を学ぶ"
-  - "怒りモード時の範囲即死攻撃を回避する戦略を習得する"
-  - "see()による大型敵の状態確認方法を学習する"
+  - "for文を使った繰り返し処理を学ぶ"
+  - "while文による条件付きループを理解する"
+  - "攻撃処理とループの組み合わせを習得"
+  - "敵を倒すための攻撃回数計算を学ぶ"
+  - "移動、攻撃、ループの統合パターンを体験"
 
 hints:
-  - "プレイヤーは左上角[0,0]から開始、ゴールは右下角[9,7]です"
-  - "2x2大型敵は中央[6,2]に配置されています（左上座標が基準）"
-  - "プレイヤーの基本攻撃力は20です"
-  - "大型敵のHP1000を攻撃力20で倒すには50回攻撃が必要です"
-  - ""
-  - "🤖 敵の動作解説:"
-  - "  【平常時】HP50%以上では完全に無害 - 移動せず、攻撃せず、追跡しません"
-  - "  【怒りモード突入】HP50%を下回り、かつ攻撃を受けた瞬間に発動"
-  - "  【3ターン警告】怒りモード突入後、3ターンのカウントダウンを開始"
-  - "  【範囲攻撃実行】4ターン目に周囲1マス範囲で即死攻撃を実行"
-  - "  【平常復帰】範囲攻撃後は即座に平常時に戻る（再攻撃まで無害）"
-  - ""
-  - "⚠️ 戦略のポイント:"
-  - "see()で大型敵のHPを確認して、HP500に近づいたら距離を取りましょう"
-  - "怒りモード時は「turn_left() → turn_left() → move()」で3ターンかけて回避"
-  - "範囲攻撃後は再び無害になるので、安全に再接近できます"
-  - "戦略例: 25回攻撃→回避→再接近→25回攻撃で撃破"
+  - "プレイヤーは[0,0]から北向き(N)で開始し、左下[0,9]がゴールです"
+  - "右上[9,0]と右下[9,9]に敵がいます。すべての敵を倒してからゴールに向かってください"
+  - "全てのアイテムは適切に使用してください。爆弾は処理し、それ以外は取得する必要があります"

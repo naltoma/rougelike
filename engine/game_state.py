@@ -869,11 +869,13 @@ class GameStateManager:
         items_copy = []
         for item in state.items:
             item_copy = Item(
+                id=item.id,  # v1.2.12: Required id parameter
                 position=Position(item.position.x, item.position.y),
                 item_type=item.item_type,
                 name=item.name,
                 effect=item.effect.copy(),
-                auto_equip=item.auto_equip
+                auto_equip=item.auto_equip,
+                damage=item.damage  # v1.2.12: For bomb items
             )
             items_copy.append(item_copy)
         

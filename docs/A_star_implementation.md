@@ -2,7 +2,7 @@
 
 ## 概要
 
-本ドキュメントでは、Python初学者向けローグライク演習フレームワーク（v1.2.9）において実装されたA*（エースター）アルゴリズムについて解説します。A*アルゴリズムは、ステージの自動解法探索と妥当性検証に使用されています。
+本ドキュメントでは、Python初学者向けローグライク演習フレームワーク（v1.2.12）において実装されたA*（エースター）アルゴリズムについて解説します。A*アルゴリズムは、ステージの自動解法探索と妥当性検証に使用されており、v1.2.12では高度アイテムシステム（bomb・is_available・dispose・ポーション回復）に完全対応しています。
 
 ## A*アルゴリズムとは
 
@@ -174,9 +174,57 @@ class ActionType(Enum):
     ATTACK = "attack"
     PICKUP = "pickup"
     WAIT = "wait"
+    IS_AVAILABLE = "is_available"  # v1.2.12新機能
+    DISPOSE = "dispose"            # v1.2.12新機能
 ```
 
 各アクションは完全にゲーム状態を更新し、敵のターンも含めて次の状態を計算します。
+
+#### v1.2.12 高度アイテムシステム対応
+
+A*実装は以下の新機能に完全対応しています：
+
+**不利アイテム（bomb）対応**:
+- 爆弾アイテムの取得によるHP減少をシミュレーション
+- プレイヤーHP管理による戦略的判断
+- 爆弾によるプレイヤー死亡状態も考慮した探索
+
+**高度アイテム操作API**:
+- `is_available()`: アイテム取得可否の事前確認（ターン消費なし）
+- `dispose()`: 危険アイテムの安全処分（ターン消費あり）
+- API制約遵守: allowed_apisに含まれない場合は使用禁止
+
+**ポーションHP回復システム**:
+- ポーション取得時の自動HP回復処理
+- 回復量に応じた戦略的ルート選択
+- max_hp制限を考慮した最適回復計算
+
+**戦略的判断システム**:
+```python
+def _process_pickup_strategy(self, state: GameState, item_pos: Tuple[int, int]):
+    """アイテム取得戦略の決定"""
+    item = self.items[item_pos]
+
+    if item.item_type == ItemType.BOMB:
+        # 爆弾の場合：is_available → dispose の安全ルート
+        if "is_available" in allowed_apis and "dispose" in allowed_apis:
+            return [ActionType.IS_AVAILABLE, ActionType.DISPOSE]
+        else:
+            # APIが無い場合は回避
+            return []
+
+    elif item.item_type == ItemType.POTION:
+        # ポーションの場合：HP回復効果を計算
+        heal_amount = min(item.value, state.player_hp - state.player_max_hp)
+        if heal_amount > 0:
+            return [ActionType.PICKUP]  # 回復効果あり
+        else:
+            return []  # 満タンなので不要
+
+    else:
+        # 通常アイテム（武器・鍵など）
+        return [ActionType.PICKUP]
+```
 
 ## アルゴリズムの詳細実装
 
@@ -209,30 +257,54 @@ def find_path(self, max_turns: Optional[int] = None) -> Optional[List[ActionType
 
 ```python
 def _heuristic(self, state: GameState) -> int:
-    """戦闘・アイテム考慮型ヒューリスティック"""
+    """戦闘・アイテム考慮型ヒューリスティック（v1.2.12拡張）"""
     # ゴールまでのマンハッタン距離
     goal_dist = abs(state.player_pos[0] - self.goal_pos[0]) + \
                 abs(state.player_pos[1] - self.goal_pos[1])
 
-    # 未収集アイテムのコスト
+    # 未収集アイテムのコスト（v1.2.12: アイテム種別考慮）
     uncollected_items = set(self.items.keys()) - state.collected_items
     item_cost = 0
     if uncollected_items:
-        # 最近アイテムまでの距離 + 最遠アイテムからゴールまでの距離
-        nearest_item_dist = min(...)
-        farthest_to_goal = max(...)
-        item_cost = nearest_item_dist + farthest_to_goal
+        for item_pos in uncollected_items:
+            item = self.items[item_pos]
+            dist_to_item = abs(state.player_pos[0] - item_pos[0]) + \
+                          abs(state.player_pos[1] - item_pos[1])
+
+            # アイテム種別に応じたコスト調整
+            if item.item_type == ItemType.BOMB:
+                # 爆弾：dispose処理のコスト（is_available + dispose = 2ターン）
+                if "dispose" in self.stage.constraints.allowed_apis:
+                    item_cost += dist_to_item + 2  # 移動 + 確認 + 処分
+                else:
+                    item_cost += 999  # 処分不可の場合は高コスト（回避）
+
+            elif item.item_type == ItemType.POTION:
+                # ポーション：HP回復の価値を考慮
+                heal_value = min(item.value, state.player_max_hp - state.player_hp)
+                if heal_value > 0:
+                    item_cost += dist_to_item + 1  # 通常の取得コスト
+                else:
+                    item_cost += 999  # 不要な場合は回避
+
+            else:
+                # 通常アイテム（武器・鍵など）
+                item_cost += dist_to_item + 1
 
     # 残存敵への攻撃コスト
-    alive_enemies = [e for e in state.enemies.values() if e.is_alive]
+    alive_enemies = [e for e in state.enemies.values() if e.hp > 0]
     enemy_cost = 0
     if alive_enemies:
-        # 各敵への攻撃必要回数を推定
         for enemy in alive_enemies:
-            attacks_needed = math.ceil(enemy.hp / player_attack_power)
+            attacks_needed = math.ceil(enemy.hp / state.player_attack_power)
             enemy_cost += attacks_needed
 
-    return goal_dist + item_cost + enemy_cost
+    # HP不足リスク評価（v1.2.12新機能）
+    hp_risk = 0
+    if state.player_hp < 30:  # 低HP時のリスクペナルティ
+        hp_risk = (30 - state.player_hp) * 2
+
+    return goal_dist + item_cost + enemy_cost + hp_risk
 ```
 
 このヒューリスティック関数は、単純な距離だけでなく、アイテム収集と敵撃破のコストも考慮することで、より正確な経路探索を実現しています。
@@ -251,12 +323,20 @@ def _apply_action(self, state: GameState, action: ActionType) -> Optional[GameSt
             new_state.player_pos = new_pos
     elif action == ActionType.ATTACK:
         self._process_attack(new_state)
+    elif action == ActionType.PICKUP:
+        self._process_pickup(new_state)  # ポーション回復・爆弾ダメージ処理
+    elif action == ActionType.IS_AVAILABLE:
+        # ターン消費なし、情報取得のみ
+        return new_state
+    elif action == ActionType.DISPOSE:
+        self._process_dispose(new_state)  # 危険アイテム安全処分
     # ... 他のアクション処理
 
-    # 敵ターン処理
-    self._process_enemy_turns(new_state)
+    # 敵ターン処理（IS_AVAILABLE以外のアクション）
+    if action != ActionType.IS_AVAILABLE:
+        self._process_enemy_turns(new_state)
+        new_state.turn_count += 1
 
-    new_state.turn_count += 1
     return new_state
 ```
 
@@ -341,6 +421,7 @@ python scripts/validate_stage.py --file stages/stage01.yml --solution --max-node
 
 ### 出力例
 
+#### 基本ステージの探索例
 ```
 A*探索開始: 最大ノード数 1,000,000 (100K/10M ノード毎に進捗表示)
 進捗: 100,000 ノード探索済み | キュー: 45,123 | 探索済み: 54,877
@@ -356,6 +437,30 @@ def solve():
     pickup()
     move()
     # 12ステップでクリア
+```
+
+#### v1.2.12 高度アイテムシステム対応例
+```
+A*探索開始: Stage08 (is_available/dispose対応)
+進捗: 50,000 ノード探索済み | 爆弾回避ルート探索中
+進捗: 150,000 ノード探索済み | アイテム安全処分ルート確認
+探索完了: 最適解発見! 総ノード数: 167,823
+
+=== 解法コード（v1.2.12機能使用） ===
+def solve():
+    move()
+    move()
+    # 爆弾位置に到達
+    if is_available():  # 安全確認
+        pickup()        # 安全な場合のみ取得
+    else:
+        dispose()       # 危険アイテムを安全処分
+
+    turn_right()
+    move()
+    pickup()  # ポーション取得（HP回復）
+    move()
+    # ポーションでHP+37回復後、ゴールへ
 ```
 
 ## 教育的価値
@@ -415,8 +520,26 @@ def solve():
 2. **高度なヒューリスティック**: 戦闘・収集・移動を統合的に評価
 3. **適応的パフォーマンス**: ステージ特性に応じた探索戦略
 4. **教育的配慮**: 進捗表示とわかりやすい出力形式
+5. **v1.2.12拡張機能**: 高度アイテムシステム完全対応
 
-これにより、学習者は自分の解法の妥当性を確認でき、教員は自動生成されたステージの品質を保証できます。A*アルゴリズムの実装を通じて、高度なアルゴリズム設計と最適化技術の実践的学習が可能になっています。
+### v1.2.12での教育的価値向上
+
+**戦略的思考育成**:
+- 不利アイテム（爆弾）による危険回避の学習
+- is_available()による事前情報収集の重要性理解
+- dispose()による代替解決策の習得
+
+**プログラミング概念の実践**:
+- 条件分岐ロジック（アイテム種別判定）
+- リスク評価アルゴリズム（HP管理）
+- 例外処理パターン（安全な処理手順）
+
+**システム設計の理解**:
+- API設計原則（情報取得と操作の分離）
+- 状態管理の複雑性（HP・アイテム・敵状態の統合）
+- パフォーマンス最適化（ヒューリスティック関数の改良）
+
+これにより、学習者は自分の解法の妥当性を確認でき、教員は自動生成されたステージの品質を保証できます。v1.2.12では、さらに高度な戦略的思考とプログラミング概念の学習が可能になり、A*アルゴリズムの実装を通じて、包括的なアルゴリズム設計と最適化技術の実践的学習環境を提供しています。
 
 ---
 

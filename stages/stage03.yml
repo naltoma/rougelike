@@ -34,3 +34,6 @@ items: []
 constraints:
   max_turns: 25
   allowed_apis: ["turn_left", "turn_right", "move", "see"]
+
+victory_conditions:
+  - type: "reach_goal"

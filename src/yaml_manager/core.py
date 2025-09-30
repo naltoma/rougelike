@@ -206,5 +206,7 @@ def _item_to_dict(item: ItemConfiguration) -> Dict[str, Any]:
         result['description'] = item.description
     if hasattr(item, 'value') and item.value is not None:
         result['value'] = item.value
+    if hasattr(item, 'damage') and item.damage is not None:  # v1.2.12: For bomb items
+        result['damage'] = item.damage
 
     return result

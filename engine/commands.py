@@ -7,9 +7,12 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Optional, Any, Dict
 from enum import Enum
+import logging
 
 from . import GameState, Position, Direction, ItemType
 from .validator import Validator
+
+logger = logging.getLogger(__name__)
 
 
 class CommandResult(Enum):
@@ -68,6 +71,7 @@ class PickupResult(ExecutionResult):
     item_name: str = ""
     item_effect: Dict[str, int] = None
     auto_equipped: bool = False
+    healing_received: int = 0  # v1.2.12: HP回復量
     
     def __post_init__(self):
         super().__post_init__()
@@ -79,7 +83,18 @@ class PickupResult(ExecutionResult):
 class WaitResult(ExecutionResult):
     """待機結果の詳細"""
     enemy_actions_triggered: int = 0
-    
+
+    def __post_init__(self):
+        super().__post_init__()
+
+
+@dataclass
+class DisposeResult(ExecutionResult):
+    """アイテム処分結果の詳細 - v1.2.12"""
+    item_id: str = ""
+    item_name: str = ""
+    item_damage: int = 0
+
     def __post_init__(self):
         super().__post_init__()
 
@@ -329,34 +344,74 @@ class PickupCommand(Command):
         """足元のアイテムを取得"""
         player = game_state.player
         current_pos = player.position
-        
-        # アイテムの存在チェック
-        item = game_state.get_item_at(current_pos)
-        if item is None:
+
+        # 現在位置のアイテムを検索
+        items_at_position = [
+            item for item in game_state.items
+            if item.position.x == current_pos.x and item.position.y == current_pos.y
+        ]
+
+        if not items_at_position:
             result = PickupResult(
                 result=CommandResult.FAILED,
                 message="ここにはアイテムがありません"
             )
         else:
+            # 最初のアイテムを取得
+            item = items_at_position[0]
+
             # アイテム取得実行
             game_state.items.remove(item)
-            
-            # 自動装備処理（簡単な実装）
-            auto_equipped = item.auto_equip
-            if auto_equipped:
+
+            # v1.2.12: アイテム効果を適用
+            damage_taken = 0
+            healing_received = 0
+
+            if item.item_type == ItemType.BOMB:
+                damage_amount = item.damage if item.damage is not None else 100
+                damage_taken = player.take_damage(damage_amount)
+                logger.info(f"爆弾 {item.name or item.id} によりプレイヤーが {damage_taken} ダメージを受けました")
+
+            elif item.item_type == ItemType.POTION:
+                # ポーションによるHP回復処理
+                heal_amount = item.value if item.value is not None else 30
+                old_hp = player.hp
+                player.hp = min(player.max_hp, player.hp + heal_amount)
+                healing_received = player.hp - old_hp
+                logger.info(f"回復薬 {item.name or item.id} によりプレイヤーが {healing_received} HP回復しました")
+
+            # collected_itemsに追加
+            if hasattr(player, 'collected_items'):
+                player.collected_items.append(item.id)
+
+            # 自動装備処理（爆弾以外）
+            auto_equipped = False
+            if item.item_type != ItemType.BOMB and item.auto_equip:
+                auto_equipped = True
                 # 攻撃力や防御力を適用（簡易実装）
                 if "attack" in item.effect:
                     player.attack_power += item.effect["attack"]
                 # 他の効果も必要に応じて実装
-            
+
+            # メッセージ作成
+            message = f"{item.name or item.id}を取得しました"
+            if auto_equipped:
+                message += "（自動装備）"
+            if healing_received > 0:
+                message += f" - {healing_received}HP回復しました！"
+            if damage_taken > 0:
+                message += f" - {damage_taken}ダメージを受けました！"
+
             result = PickupResult(
                 result=CommandResult.SUCCESS,
-                message=f"{item.name}を取得しました" + ("（自動装備）" if auto_equipped else ""),
-                item_collected=item.name,
-                item_name=item.name,
+                message=message,
+                item_collected=item.name or item.id,
+                item_name=item.name or item.id,
                 item_effect=item.effect.copy(),
                 auto_equipped=auto_equipped,
-                extra_data={"item_type": item.item_type.value}
+                damage_dealt=damage_taken,
+                healing_received=healing_received,
+                extra_data={"item_type": item.item_type, "item_id": item.id}
             )
         
         self.executed = True
@@ -403,6 +458,85 @@ class WaitCommand(Command):
     
     def get_description(self) -> str:
         return "1ターン待機"
+
+
+class DisposeCommand(Command):
+    """アイテム処分コマンド - v1.2.12"""
+
+    def execute(self, game_state: GameState) -> DisposeResult:
+        """プレイヤーの現在位置にある不利アイテムを処分"""
+        player_pos = game_state.player.position
+
+        # 現在位置にアイテムがあるかチェック
+        items_at_position = [
+            item for item in game_state.items
+            if item.position.x == player_pos.x and item.position.y == player_pos.y
+        ]
+
+        if not items_at_position:
+            result = DisposeResult(
+                result=CommandResult.FAILED,
+                message="この位置にはアイテムがありません"
+            )
+            self.executed = True
+            self.result = result
+            return result
+
+        # 爆弾アイテムを探す
+        bomb_item = None
+        for item in items_at_position:
+            if item.item_type == ItemType.BOMB:
+                bomb_item = item
+                break
+
+        if bomb_item is None:
+            # 爆弾以外のアイテムがある場合：ターン消費のみで無効
+            item_types = [item.item_type.value for item in items_at_position]
+            result = DisposeResult(
+                result=CommandResult.FAILED,
+                message=f"disposal ineffective for {', '.join(item_types)} items. Turn consumed with no effect"
+            )
+            self.executed = True
+            self.result = result
+            return result
+
+        # アイテムが既に処理済みかチェック
+        if (bomb_item.id in game_state.player.collected_items or
+            bomb_item.id in game_state.player.disposed_items):
+            result = DisposeResult(
+                result=CommandResult.FAILED,
+                message="このアイテムは already handled"
+            )
+            self.executed = True
+            self.result = result
+            return result
+
+        # アイテムを処分
+        game_state.items.remove(bomb_item)
+        game_state.player.add_disposed_item(bomb_item.id)
+
+        result = DisposeResult(
+            result=CommandResult.SUCCESS,
+            message=f"爆弾アイテム {bomb_item.name or bomb_item.id} を処分しました",
+            item_id=bomb_item.id,
+            item_name=bomb_item.name,
+            item_damage=bomb_item.damage or 0
+        )
+
+        self.executed = True
+        self.result = result
+        return result
+
+    def undo(self, game_state: GameState) -> bool:
+        """アイテム処分は基本的に取り消し不可"""
+        return False
+
+    def can_undo(self) -> bool:
+        """アイテム処分は取り消し不可"""
+        return False
+
+    def get_description(self) -> str:
+        return "足元の爆弾アイテムを処分"
 
 
 class CommandInvoker:
@@ -454,8 +588,8 @@ class CommandInvoker:
 
 # エクスポート用
 __all__ = [
-    "Command", "ExecutionResult", "AttackResult", "PickupResult", "WaitResult",
+    "Command", "ExecutionResult", "AttackResult", "PickupResult", "WaitResult", "DisposeResult",
     "CommandResult", "CommandInvoker",
-    "TurnLeftCommand", "TurnRightCommand", "MoveCommand", 
-    "AttackCommand", "PickupCommand", "WaitCommand"
+    "TurnLeftCommand", "TurnRightCommand", "MoveCommand",
+    "AttackCommand", "PickupCommand", "WaitCommand", "DisposeCommand"
 ]

@@ -62,6 +62,7 @@ class ItemType(Enum):
     COIN = "coin"            # 金貨
     GEM = "gem"              # 宝石
     SCROLL = "scroll"        # 巻物
+    BOMB = "bomb"            # 爆弾 (v1.2.12)
 
 class EnemyType(Enum):
     """敵の種類"""
@@ -149,6 +150,9 @@ class Character:
     hp: int = 100
     max_hp: int = 100
     attack_power: int = 30
+    # v1.2.12: プレイヤー専用フィールド（敵では使用されない）
+    collected_items: List[str] = field(default_factory=list)
+    disposed_items: List[str] = field(default_factory=list)
     
     def __post_init__(self):
         """バリデーション"""
@@ -209,6 +213,17 @@ class Character:
         actual_heal = min(amount, self.max_hp - self.hp)
         self.hp += actual_heal
         return actual_heal
+
+    def add_disposed_item(self, item_id: str):
+        """アイテムを処分済みリストに追加（重複チェック付き）"""
+        if item_id not in self.disposed_items:
+            self.disposed_items.append(item_id)
+
+    def hp_percentage(self) -> float:
+        """HP割合を返す"""
+        if self.max_hp == 0:
+            return 0.0
+        return (self.hp / self.max_hp) * 100.0
 
 @dataclass
 class Enemy(Character):
@@ -399,16 +414,32 @@ class Enemy(Character):
 @dataclass
 class Item:
     """アイテム"""
+    id: str
+    item_type: str
     position: Position
-    item_type: ItemType
-    name: str
-    effect: Dict[str, int]
+    name: str = ""
+    description: str = ""
+    value: int = 0
+    effect: Dict[str, int] = field(default_factory=dict)
     auto_equip: bool = True
-    
+    damage: Optional[int] = None  # v1.2.12: 爆弾アイテム用ダメージ属性
+
     def __post_init__(self):
         """バリデーション"""
-        if not self.name:
-            raise ValueError("アイテム名は必須です")
+        if not self.id:
+            raise ValueError("アイテムIDは必須です")
+        if not self.item_type:
+            raise ValueError("アイテムタイプは必須です")
+
+        # 爆弾タイプの場合のダメージ検証
+        if self.item_type == ItemType.BOMB:
+            if self.damage is None:
+                self.damage = 100  # デフォルトダメージ
+            elif self.damage <= 0:
+                raise ValueError("Damage must be positive")
+        elif self.damage is not None:
+            raise ValueError("damage attribute is only allowed for bomb items")
+
         if not isinstance(self.effect, dict):
             raise ValueError("効果は辞書形式である必要があります")
 
@@ -447,15 +478,16 @@ class Board:
 class GameState:
     """ゲームの現在状態"""
     player: Character
-    enemies: List[Enemy]
-    items: List[Item]
-    board: Board
+    enemies: List[Enemy] = field(default_factory=list)
+    items: List[Item] = field(default_factory=list)
+    board: Optional[Board] = None
     turn_count: int = 0
     max_turns: int = 100
     status: GameStatus = GameStatus.PLAYING
     goal_position: Optional[Position] = None
     stage_id: Optional[str] = None  # ステージ識別用
     victory_conditions: Optional[List[Dict[str, str]]] = None  # 勝利条件リスト
+    constraints: Dict[str, bool] = field(default_factory=dict)  # v1.2.12: ステージ制約条件
     
     def __post_init__(self):
         """バリデーション"""
@@ -486,14 +518,15 @@ class GameState:
         if not self.check_goal_reached():
             return False
 
-        # 勝利条件が指定されている場合は個別にチェック
+        # 勝利条件が指定されている場合は全条件をチェック
         if self.victory_conditions:
             for condition in self.victory_conditions:
                 condition_type = condition.get('type')
 
                 if condition_type == 'collect_all_items':
-                    # 全てのアイテムが収集されているかチェック
-                    if len(self.items) > 0:  # まだ収集されていないアイテムがある
+                    # v1.2.12: 全てのアイテムが処理されているかチェック（収集 or 処分）
+                    # まだマップ上に残っているアイテムがあるかチェック
+                    if len(self.items) > 0:
                         return False
 
                 elif condition_type == 'defeat_all_enemies':
@@ -503,7 +536,7 @@ class GameState:
                         return False
 
                 elif condition_type == 'reach_goal':
-                    # ゴール到達は既に上でチェック済み
+                    # ゴール到達は上で既にチェック済み
                     pass
 
         else:
@@ -514,7 +547,41 @@ class GameState:
                 return False
 
         return True
-    
+
+    def get_completion_status(self):
+        """ステージ完了状況を詳細に取得 - v1.2.12"""
+        total_items = len(self.items) + len(self.player.collected_items) + len(self.player.disposed_items)
+        handled_items = len(self.player.collected_items) + len(self.player.disposed_items)
+
+        return {
+            "total_items": total_items,
+            "handled_items": handled_items,
+            "remaining_items": len(self.items),
+            "collected_items": len(self.player.collected_items),
+            "disposed_items": len(self.player.disposed_items),
+            "completion_percentage": (handled_items / total_items * 100) if total_items > 0 else 100.0,
+            "at_goal": self.check_goal_reached()
+        }
+
+    def validate_item_handling(self):
+        """アイテム処理の整合性をチェック - v1.2.12"""
+        collected_set = set(self.player.collected_items)
+        disposed_set = set(self.player.disposed_items)
+
+        # 重複チェック
+        overlap = collected_set & disposed_set
+        if overlap:
+            return {
+                "valid": False,
+                "error": f"Items cannot be both collected and disposed: {list(overlap)}"
+            }
+
+        return {"valid": True, "error": None}
+
+    def is_stage_complete(self):
+        """ステージ完了判定 - v1.2.12対応"""
+        return self.check_victory_conditions()
+
     def get_item_at(self, pos):
         """指定座標のアイテムを取得"""
         for item in self.items:

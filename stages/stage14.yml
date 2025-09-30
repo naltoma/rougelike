@@ -1,0 +1,95 @@
+id: stage14
+title: 大型敵2x2・3x3複合戦闘ステージ  
+description: 2x2大型敵と3x3大型敵の複合戦闘ステージです。2種類の大型敵のサイズと攻撃パターンの違いを理解し、戦略的に攻略しましょう。
+
+board:
+  size: [12, 10] 
+  grid:
+    - "............"
+    - "............"
+    - "............"
+    - "............"
+    - "............"
+    - "............"
+    - "............"
+    - "............"
+    - "............"
+    - "............"
+  legend:
+    ".": "empty"
+    "P": "player"
+    "G": "goal"
+    "L": "large_enemy"
+
+player:
+  start: [0, 0]
+  direction: "E"
+  hp: 100
+  max_hp: 100
+  attack_power: 20
+
+goal:
+  position: [11, 9]
+
+enemies:
+  - id: "large_2x2_guardian"
+    type: "large_2x2"
+    position: [8, 2]  # 2x2敵の左上座標
+    direction: "W"
+    hp: 1000
+    max_hp: 1000
+    attack_power: 1000
+    rage_threshold: 0.5
+    area_attack_range: 1
+    behavior: "stage11_special"
+    stage11_special: true
+
+  - id: "titan_guardian"
+    type: "large_3x3"
+    position: [8, 5]  # 3x3敵の左上座標
+    direction: "W"
+    hp: 2000  # 攻撃力20で100回攻撃で倒せるHP
+    max_hp: 2000
+    attack_power: 1000
+    rage_threshold: 0.5
+    area_attack_range: 2
+    behavior: "stage11_special"
+    stage11_special: true
+
+items: []
+
+constraints:
+  max_turns: 1000
+  allowed_apis: ["turn_left", "turn_right", "move", "attack", "pickup", "wait", "see"]
+
+victory_conditions:
+  - type: "defeat_all_enemies"
+  - type: "reach_goal"
+
+# 学習目標とヒント
+learning_objectives:
+  - "2x2大型敵と3x3大型敵のサイズの違いを理解する"
+  - "2x2敵はStage11と同じ怒りモード動作（HP50%以下で3ターン後範囲攻撃）"
+  - "3x3敵は2マス範囲攻撃を持つより強力な敵"
+  - "複数の大型敵との戦闘における優先順位判断"
+  - "高HP敵（2000HP）に対する長期戦戦略"
+
+hints:
+  - "プレイヤーは左上角[0,0]から開始、ゴールは右下角[11,9]です"
+  - "2x2大型敵は[8,2]を左上として配置（占有範囲[8,2]～[9,3]）"
+  - "3x3大型敵は[8,5]を左上として配置（占有範囲[8,5]～[10,7]）"
+  - "プレイヤー攻撃力20、2x2敵HP1000（50回攻撃）、3x3敵HP2000（100回攻撃）"
+  - ""
+  - "🤖 敵の動作解説（両方とも同じパターン）:"
+  - "  【平常時】HP50%以上では完全に無害 - 移動せず、攻撃せず、追跡しません"
+  - "  【怒りモード突入】HP50%を下回り、かつ攻撃を受けた瞬間に発動"
+  - "  【3ターン警告】怒りモード突入後、3ターンのカウントダウンを開始"
+  - "  【範囲攻撃実行】4ターン目に範囲攻撃を実行（2x2敵=1マス、3x3敵=2マス）"
+  - "  【平常復帰】範囲攻撃後は即座に平常時に戻る（再攻撃まで無害）"
+  - ""
+  - "⚠️ 戦略のポイント:"
+  - "戦略1: 2x2敵から先に攻撃（HP低く、範囲攻撃も小さい）"
+  - "戦略2: 3x3敵は2マス範囲攻撃なので、より遠くまで避ける必要あり"
+  - "see()で両方の敵の位置と状態を確認して安全ルートを計画"
+  - "複数敵の怒りモードが重複しないよう、一体ずつ集中攻撃"
+  - "合計150回攻撃が必要な高難易度ステージです"

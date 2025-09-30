@@ -1,13 +1,13 @@
 # Python初学者向けローグライク演習フレームワーク
 
-[![Version](https://img.shields.io/badge/version-v1.2.11-blue.svg)](VERSION_HISTORY.md)
+[![Version](https://img.shields.io/badge/version-v1.2.12-blue.svg)](VERSION_HISTORY.md)
 [![Python](https://img.shields.io/badge/python-3.8+-green.svg)](https://python.org)
 [![Tests](https://img.shields.io/badge/tests-88.9%25-brightgreen.svg)](#🧪-テスト実行)
 [![Quality](https://img.shields.io/badge/quality-優良⭐-gold.svg)](#📈-品質メトリクス)
 
 Python初学者のための教育用ローグライクゲームフレームワークです。体験的なプログラミング学習を通じて、基礎的なプログラミングスキルを習得できます。
 
-> **🎨 v1.2.11 GUI Enhancement完成！** 動的ステージ名表示・ステータス変化強調表示・ステップ実行維持機能で視覚的学習体験を大幅向上 - 詳細は [docs/v1.2.11.md](docs/v1.2.11.md) をご覧ください
+> **💊 v1.2.12 高度アイテムシステム完成！** 不利アイテム・is_available/dispose API・ポーション回復・包括的ドキュメント・プロジェクト整理で学習体験を大幅向上 - 詳細は [docs/v1.2.12.md](docs/v1.2.12.md) をご覧ください
 
 ## 🎯 特徴
 
@@ -27,6 +27,8 @@ Python初学者のための教育用ローグライクゲームフレームワ�
 - **🏆 最終ボス複合戦**: 交互怒りパターン検出・総合戦略思考・最高難易度挑戦
 - **🎯 ランダムステージ生成**: 5種類のステージタイプ自動生成・A*解法探索・無限学習コンテンツ
 - **🎨 GUI Enhancement**: 動的ステージ名表示・ステータス変化強調表示・ステップ実行維持
+- **💊 高度アイテムシステム**: 不利アイテム(bomb)・is_available/dispose API・ポーションHP回復機能
+- **📚 包括的ドキュメント**: 全15ステージ詳細解説・段階的学習ガイド・プロジェクト構造最適化
 
 ### 📊 教師支援機能
 - **リアルタイム学習データ収集**: 学習者の行動を詳細記録
@@ -90,6 +92,8 @@ rougelike/
     │   ├── simple_algorithm.md # Stage01特化アルゴリズム（522行）
     │   ├── general_purpose.md # 汎用プレイヤー構築（1620行）
     │   └── see_description.md # API完全リファレンス（414行）
+    │   └── see_description.md # API完全リファレンス（414行）
+    ├── STAGES.md           # ステージ一覧
     └── v1.2.10.md          # v1.2.10リリースノート
 ```
 
@@ -406,8 +410,8 @@ make test
 
 ## 🔄 既知の問題
 
-- **pygame依存関係**: GUIレンダラー機能にpygameが必要
-- **一部APIメソッド**: メソッド名の不一致による互換性問題
+- **pygame依存関係**: GUIレンダラー機能にpygameが必要（オプション）
+- **背景プロセス**: 一部のデバッグプロセスが稼働中の場合あり（影響なし）
 
 ## 🤝 貢献
 
@@ -430,12 +434,12 @@ Python初学者教育の向上を目指して開発されました。教育現�
 
 ## 📋 更新履歴
 
-最新バージョン: **v1.2.11** (2025年9月22日)
-- 🎨 GUI Enhancement - 動的ステージ名表示・ステータス変化強調表示
-- 🖥️ 視覚的学習体験の大幅向上（色・記号・太字による強調）
-- ⏸️ ステップ実行中の強調表示維持機能（学習支援）
-- 🐛 強調表示持続問題の根本解決（Critical Bug Fix）
-- 🧪 包括的テストシステム（TDD開発・継続的品質保証）
+最新バージョン: **v1.2.12** (2025年9月29日)
+- 💊 高度アイテムシステム - 不利アイテム(bomb)・is_available/dispose API・ポーションHP回復
+- 📚 包括的ドキュメント - 全15ステージ詳細解説・段階的学習ガイド
+- 🧹 プロジェクト整理 - ファイル構造最適化・テスト環境統合
+- 📈 学習効率向上 - 戦略的思考育成・包括的学習支援体制
+- 🔧 システム安定化 - A*パスファインディング修正・品質保証完成
 
 詳細な変更履歴は [VERSION_HISTORY.md](VERSION_HISTORY.md) をご覧ください。
 
@@ -447,5 +451,3 @@ Python初学者教育の向上を目指して開発されました。教育現�
 - v1.2.9からは、[spec kit](https://github.com/github/spec-kit)で作成しています。
 
 ---
-
-**🎮 楽しく学び、効果的に指導する - Python教育の新しい形 v1.2.11**

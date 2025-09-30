@@ -23,6 +23,7 @@ player:
   direction: "E"
   hp: 100
   max_hp: 100
+  attack_power: 30
 
 goal:
   position: [6, 2]
@@ -32,7 +33,7 @@ enemies:
     type: "orc"
     position: [4, 2]
     direction: "N"
-    hp: 31
+    hp: 100
     max_hp: 100
     attack_power: 100
     vision_range: 2
@@ -53,6 +54,7 @@ constraints:
 
 victory_conditions:
   - type: "defeat_all_enemies"
+  - type: collect_all_items
   - type: "reach_goal"
 
 # 学習目標とヒント
@@ -67,11 +69,6 @@ hints:
   - "プレイヤーは東向き(E)、位置[0,2]、HP100、攻撃力30で開始"
   - "敵は位置[4,2]、HP31、攻撃力100の強敵（1撃でプレイヤー撃破）"
   - "🎯 戦略：武器取得が生存の鍵です"
-  - "まず move()を2回実行して武器[2,2]に到達"
   - "pickup()で鋼の剣を取得すると攻撃力30→65に強化"
-  - "武器未装備時：攻撃力30では敵HP31を倒せない（29ダメージ）"
-  - "武器装備時：攻撃力65で敵HP31を1撃で倒せる（31ダメージ）"
-  - "敵は正面からのみ攻撃可能（壁で側面・背後をブロック）"
-  - "敵の攻撃力100は致命的（プレイヤーHP100を1撃撃破）"
-  - "move()×2 → pickup() → move()×2 → attack() → move()×2"
-  - "武器取得せずに敵に近づくと即座に敗北します"
+  - "武器未装備時：攻撃力30では敵HP100を倒せない"
+  - "武器装備時：攻撃力65で敵HP100を2撃で倒せる"

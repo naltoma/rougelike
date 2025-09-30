@@ -24,8 +24,9 @@ from .educational_feedback import (
 )
 from .data_uploader import initialize_data_uploader, get_data_uploader
 from .commands import (
-    TurnLeftCommand, TurnRightCommand, MoveCommand, 
-    AttackCommand, PickupCommand, WaitCommand, ExecutionResult
+    TurnLeftCommand, TurnRightCommand, MoveCommand,
+    AttackCommand, PickupCommand, WaitCommand, DisposeCommand,
+    ExecutionResult, CommandResult
 )
 from .action_history_tracker import ActionHistoryTracker, ActionTrackingError
 from .execution_controller import ExecutionController
@@ -162,17 +163,7 @@ class APILayer:
                     
                 enemies.append(enemy)
             
-            items = []
-            for item_data in stage.items:
-                item_type = getattr(ItemType, item_data["type"].upper())
-                item = Item(
-                    position=Position(*item_data["position"]),
-                    item_type=item_type,
-                    name=item_data["name"],
-                    effect=item_data.get("effect", {}),
-                    auto_equip=item_data.get("auto_equip", True)
-                )
-                items.append(item)
+            items = stage.items  # Items are already Item objects from StageLoader
             
             # ボード作成
             from . import Board
@@ -697,7 +688,60 @@ class APILayer:
         except Exception as e:
             self._handle_error(e, {"action": "wait", "operation": "turn_management"})
             return False
-    
+
+    def dispose(self) -> ExecutionResult:
+        """現在位置の不利アイテム（爆弾）を処分 - v1.2.12
+
+        Returns:
+            ExecutionResult: 処分結果
+
+        Note:
+            この操作は1ターンを消費します
+        """
+        try:
+            self._ensure_initialized()
+            self._check_api_allowed("dispose")
+
+            # ゲーム終了後は実行不可
+            if not self._check_game_active():
+                return ExecutionResult(
+                    result=CommandResult.ERROR,
+                    message="ゲームが終了しています。新しいステージを開始してください。"
+                )
+
+            # 実行制御の待機処理
+            if self.execution_controller:
+                self.execution_controller.wait_for_action()
+
+            # アクション履歴追跡（実行制御後）
+            if self.action_tracker:
+                self.action_tracker.track_action("dispose")
+
+            # セッションログ記録（実行制御後）
+            self._log_action("dispose")
+
+            command = DisposeCommand()
+            result = self.game_manager.execute_command(command)
+
+            # ステップ実行完了処理
+            self._handle_step_completion("dispose")
+
+            self._record_call("dispose", result)
+
+            if result.is_success:
+                print(f"🔧 {result.message}")
+            else:
+                print(f"❌ {result.message}")
+
+            return result
+
+        except Exception as e:
+            self._handle_error(e, {"action": "dispose", "operation": "item_management"})
+            return ExecutionResult(
+                result=CommandResult.ERROR,
+                message=f"処分操作でエラーが発生しました: {e}"
+            )
+
     def get_stage_info(self) -> Dict[str, Any]:
         """ステージの基本情報を取得"""
         try:
@@ -2300,11 +2344,57 @@ def show_class_report(class_students: List[str]) -> None:
         print(f"   • {issue}")
 
 
+def is_available() -> bool:
+    """現在位置のアイテムが取得可能かチェック - v1.2.12
+
+    Returns:
+        bool: 取得可能（beneficial item）ならTrue、不可能（bomb等）ならFalse
+
+    Note:
+        この操作はターンを消費しません
+    """
+    from . import ItemType  # Import here to avoid circular import issues
+
+    if not _global_api.game_manager:
+        return False
+
+    game_state = _global_api.game_manager.current_state
+    player_pos = game_state.player.position
+
+    # 現在位置のアイテムを探す
+    items_at_position = [
+        item for item in game_state.items
+        if item.position.x == player_pos.x and item.position.y == player_pos.y
+    ]
+
+    if not items_at_position:
+        return False
+
+    # 爆弾タイプのアイテムがあるかチェック
+    for item in items_at_position:
+        if item.item_type == ItemType.BOMB:
+            return False  # 爆弾は取得不可
+
+    return True  # 爆弾以外のアイテムは取得可能
+
+
+def dispose() -> ExecutionResult:
+    """現在位置の不利アイテム（爆弾）を処分 - v1.2.12
+
+    Returns:
+        ExecutionResult: 処分結果
+
+    Note:
+        この操作は1ターンを消費します
+    """
+    return _global_api.dispose()
+
+
 # エクスポート用
 __all__ = [
     "APILayer", "APIUsageError", "initialize_api",
     "initialize_stage", "turn_left", "turn_right", "move",
-    "attack", "pickup", "wait", "see", "can_undo", "undo",
+    "attack", "pickup", "wait", "dispose", "is_available", "see", "can_undo", "undo",
     "is_game_finished", "get_game_result", "get_call_history", "reset_stage",
     "show_current_state", "set_auto_render", "show_legend", "show_action_history",
     "enable_action_tracking", "disable_action_tracking", "reset_action_history",

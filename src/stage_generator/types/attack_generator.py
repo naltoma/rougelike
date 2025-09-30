@@ -8,7 +8,8 @@ import sys
 sys.path.append(str(Path(__file__).parent.parent.parent))
 from stage_generator.data_models import (
     StageConfiguration, BoardConfiguration, PlayerConfiguration,
-    GoalConfiguration, EnemyConfiguration, ConstraintConfiguration
+    GoalConfiguration, EnemyConfiguration, ConstraintConfiguration,
+    ALL_AVAILABLE_APIS
 )
 
 
@@ -64,9 +65,9 @@ class AttackStageGenerator:
             items=[],  # Attack stages focus on combat, no items
             constraints=ConstraintConfiguration(
                 max_turns=self._calculate_max_turns(width, height, len(enemies)),
-                allowed_apis=["turn_left", "turn_right", "move", "attack", "see"]
+                allowed_apis=ALL_AVAILABLE_APIS
             ),
-            victory_conditions=[{"type": "defeat_all_enemies"}, {"type": "reach_goal"}]
+            victory_conditions=self._generate_victory_conditions(enemies)
         )
 
         return stage_config
@@ -223,11 +224,24 @@ class AttackStageGenerator:
                 attack_power=self.random.randint(20, 40),
                 behavior="static"
             )
-            # 攻撃ステージでは背後接敵を可能にするためvision_rangeを制限
-            enemy.vision_range = 1
+            # 統一された視野設定
+            enemy.vision_range = 2
             enemies.append(enemy)
 
         return enemies
+
+    def _generate_victory_conditions(self, enemies: List[EnemyConfiguration]) -> List[dict]:
+        """Generate victory conditions based on stage content"""
+        conditions = []
+
+        # Add defeat_all_enemies if enemies are present
+        if enemies:
+            conditions.append({"type": "defeat_all_enemies"})
+
+        # Always include reach_goal
+        conditions.append({"type": "reach_goal"})
+
+        return conditions
 
     def _random_direction(self) -> str:
         """Generate random direction"""

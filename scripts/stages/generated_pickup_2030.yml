@@ -1,0 +1,98 @@
+id: generated_pickup_2030
+title: Generated Pickup Stage
+description: Randomly generated stage focusing on item collection and resource management.
+board:
+  size:
+  - 9
+  - 10
+  grid:
+  - '.........'
+  - '.........'
+  - '.........'
+  - '.........'
+  - '....##.#.'
+  - '.......#.'
+  - '....#..#.'
+  - '....#....'
+  - '....####.'
+  - '.........'
+  legend:
+    .: empty
+    '#': wall
+    P: player
+    G: goal
+    I: item
+    E: enemy
+player:
+  start:
+  - 0
+  - 0
+  direction: E
+  hp: 100
+  max_hp: 100
+goal:
+  position:
+  - 0
+  - 9
+enemies:
+- id: collector_1
+  type: normal
+  position:
+  - 2
+  - 2
+  direction: E
+  hp: 40
+  max_hp: 40
+  attack_power: 16
+  vision_range: 2
+- id: collector_2
+  type: normal
+  position:
+  - 3
+  - 3
+  direction: W
+  hp: 28
+  max_hp: 28
+  attack_power: 22
+  vision_range: 2
+items:
+- id: gem_1
+  type: gem
+  position:
+  - 0
+  - 8
+  name: 宝石
+  description: A valuable gem to collect
+  value: 42
+- id: gem_2
+  type: gem
+  position:
+  - 7
+  - 9
+  name: 宝石
+  description: A valuable gem to collect
+  value: 32
+- id: coin_3
+  type: coin
+  position:
+  - 2
+  - 9
+  name: 金貨
+  description: A valuable coin to collect
+  value: 43
+constraints:
+  max_turns: 81
+  allowed_apis:
+  - turn_left
+  - turn_right
+  - move
+  - pickup
+  - see
+  - dispose
+  - is_available
+  - attack
+  - wait
+victory_conditions:
+- type: collect_all_items
+- type: defeat_all_enemies
+- type: reach_goal

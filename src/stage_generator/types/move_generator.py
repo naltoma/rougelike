@@ -8,7 +8,7 @@ import sys
 sys.path.append(str(Path(__file__).parent.parent.parent))
 from stage_generator.data_models import (
     StageConfiguration, BoardConfiguration, PlayerConfiguration,
-    GoalConfiguration, ConstraintConfiguration
+    GoalConfiguration, ConstraintConfiguration, ALL_AVAILABLE_APIS
 )
 
 
@@ -60,7 +60,7 @@ class MoveStageGenerator:
             items=[],    # Move stages have no items
             constraints=ConstraintConfiguration(
                 max_turns=self._calculate_max_turns(width, height),
-                allowed_apis=["turn_left", "turn_right", "move", "see"]
+                allowed_apis=ALL_AVAILABLE_APIS
             ),
             victory_conditions=[{"type": "reach_goal"}]
         )

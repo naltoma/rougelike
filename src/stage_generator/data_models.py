@@ -4,6 +4,20 @@ from enum import Enum
 from typing import Optional, List, Tuple, Dict, Set, Any
 
 
+# 全利用可能API定数
+ALL_AVAILABLE_APIS = [
+    "turn_left",
+    "turn_right",
+    "move",
+    "pickup",
+    "see",
+    "dispose",
+    "is_available",
+    "attack",
+    "wait"
+]
+
+
 class StageType(Enum):
     """Enumeration of supported stage types"""
     MOVE = "move"        # Basic movement (stages 01-03 equivalent)
@@ -84,6 +98,9 @@ class ItemConfiguration:
     value: Optional[int] = None
     name: Optional[str] = None
     description: Optional[str] = None
+    damage: Optional[int] = None  # v1.2.12: For bomb items
+    effect: Optional[Dict[str, Any]] = None  # Item effects (attack, defense, etc.)
+    auto_equip: Optional[bool] = None  # Auto-equip flag
 
 
 @dataclass
@@ -171,7 +188,8 @@ class StageConfiguration:
                 position=tuple(item_data['position']),
                 value=item_data.get('value'),
                 name=item_data.get('name'),
-                description=item_data.get('description')
+                description=item_data.get('description'),
+                damage=item_data.get('damage')  # v1.2.12: For bomb items
             )
             items.append(item)
 
