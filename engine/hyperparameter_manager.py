@@ -16,10 +16,13 @@ class HyperParametersData:
     stage_id: str = "stage01"
     student_id: Optional[str] = None
     log_enabled: bool = True
-    
+
     # v1.2.4新機能: 初回確認モード関連フィールド
     initial_confirmation_mode: bool = False  # False=確認モード, True=実行モード
     stage_intro_displayed: Dict[str, bool] = field(default_factory=dict)
+
+    # v1.2.13新機能: スタミナシステム
+    enable_stamina: bool = False  # デフォルトOFF（後方互換性維持）
     
     def __post_init__(self):
         """バリデーション"""
@@ -39,10 +42,18 @@ class HyperParameterError(Exception):
     pass
 
 class HyperParameterManager:
-    """ハイパーパラメータ管理クラス"""
-    
+    """ハイパーパラメータ管理クラス（シングルトン）"""
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance.data = HyperParametersData()
+        return cls._instance
+
     def __init__(self):
-        self.data = HyperParametersData()
+        # __new__で既に初期化されているため、ここでは何もしない
+        pass
     
     def validate(self) -> bool:
         """ハイパーパラメータの検証"""

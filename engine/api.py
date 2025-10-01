@@ -186,13 +186,22 @@ class APILayer:
                 player_hp=stage.player_hp,
                 player_max_hp=stage.player_max_hp,
                 player_attack_power=stage.player_attack_power,
+                player_stamina=stage.player_stamina,  # v1.2.13
+                player_max_stamina=stage.player_max_stamina,  # v1.2.13
                 stage_id=stage_id,  # ⚠️ 重要: Stage11の特殊処理のためにstage_idを渡す
                 victory_conditions=stage.victory_conditions  # 勝利条件を渡す
             )
             
             # API制限設定
             self.current_stage_id = stage_id
-            self.allowed_apis = stage.allowed_apis
+            self.allowed_apis = stage.allowed_apis.copy()  # Copy to avoid modifying original
+
+            # v1.2.13: ENABLE_STAMINA が有効な場合、get_stamina を自動追加
+            from .hyperparameter_manager import HyperParameterManager
+            hyper_manager = HyperParameterManager()
+            if hyper_manager.data.enable_stamina and "get_stamina" not in self.allowed_apis:
+                self.allowed_apis.append("get_stamina")
+
             self.call_history.clear()
             
             # 進捗管理: ステージ挑戦開始
@@ -788,6 +797,36 @@ class APILayer:
         except Exception as e:
             self._handle_error(e, {"action": "get_stage_info", "operation": "stage_information_retrieval"})
             return {}
+
+    def get_stamina(self) -> int:
+        """現在のプレイヤースタミナ値を取得 - v1.2.13
+
+        Returns:
+            int: 現在のスタミナ値 (0以上)
+
+        Note:
+            この操作はターンもスタミナも消費しません（調査系API）
+        """
+        try:
+            self._ensure_initialized()
+            self._check_api_allowed("get_stamina")
+
+            game_state = self.game_manager.get_current_state()
+            if game_state is None:
+                return 0
+
+            # API呼び出し記録（see()と同様にターン非消費）
+            from .commands import CommandResult
+            self._record_call("get_stamina", ExecutionResult(
+                result=CommandResult.SUCCESS,
+                message=f"スタミナ確認: {game_state.player.stamina}/{game_state.player.max_stamina}"
+            ))
+
+            return game_state.player.stamina
+
+        except Exception as e:
+            self._handle_error(e, {"action": "get_stamina", "operation": "stamina_information_retrieval"})
+            return 0
 
     def see(self, vision_range: int = 2) -> Dict[str, Any]:
         """周囲の状況を確認"""
@@ -2390,11 +2429,26 @@ def dispose() -> ExecutionResult:
     return _global_api.dispose()
 
 
+def get_stamina() -> int:
+    """現在のプレイヤースタミナ値を取得 - v1.2.13
+
+    Returns:
+        int: 現在のスタミナ値 (0以上)
+
+    Raises:
+        RuntimeError: ゲームが実行されていない場合
+
+    Note:
+        この操作はターンもスタミナも消費しません（調査系API）
+    """
+    return _global_api.get_stamina()
+
+
 # エクスポート用
 __all__ = [
     "APILayer", "APIUsageError", "initialize_api",
     "initialize_stage", "turn_left", "turn_right", "move",
-    "attack", "pickup", "wait", "dispose", "is_available", "see", "can_undo", "undo",
+    "attack", "pickup", "wait", "dispose", "is_available", "get_stamina", "see", "can_undo", "undo",
     "is_game_finished", "get_game_result", "get_call_history", "reset_stage",
     "show_current_state", "set_auto_render", "show_legend", "show_action_history",
     "enable_action_tracking", "disable_action_tracking", "reset_action_history",

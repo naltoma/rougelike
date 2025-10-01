@@ -162,6 +162,11 @@ class CuiRenderer(Renderer):
         print(f"📍 位置: ({game_state.player.position.x}, {game_state.player.position.y})")
         print(f"🧭 向き: {game_state.player.direction.value}")
         print(f"❤️  HP: {game_state.player.hp}/{game_state.player.max_hp}")
+        # v1.2.13: スタミナ表示
+        from .hyperparameter_manager import HyperParameterManager
+        hyper_manager = HyperParameterManager()
+        if hyper_manager.data.enable_stamina:
+            print(f"⚡ スタミナ: {game_state.player.stamina}/{game_state.player.max_stamina}")
         print(f"⚔️ 攻撃力: {game_state.player.attack_power}")
         print(f"🎯 状態: {game_state.status.value}")
         
@@ -878,6 +883,53 @@ class GuiRenderer(Renderer):
                 self._draw_text(f"HP: {game_state.player.hp}/{game_state.player.max_hp}", sidebar_x + 20, y_offset, self.small_font)
                 y_offset += 20
 
+            # v1.2.13: Stamina display (only if enabled)
+            from .hyperparameter_manager import HyperParameterManager
+            hyper_manager = HyperParameterManager()
+            if hyper_manager.data.enable_stamina:
+                if should_highlight:
+                    stamina_change = self.status_tracker.get_change_delta("player", "stamina")
+                    if stamina_change != 0:
+                        # Stamina changed - highlight
+                        if stamina_change < 0:
+                            highlight_color = (255, 165, 0)  # Orange for stamina decrease
+                            change_symbol = self.display_manager.text_config.decrease_symbol
+                        else:
+                            highlight_color = (0, 200, 255)  # Cyan for stamina increase
+                            change_symbol = self.display_manager.text_config.increase_symbol
+
+                        font = self.font
+                        base_text = f"Stamina: "
+                        value_text = str(game_state.player.stamina)
+                        suffix_text = f"/{game_state.player.max_stamina} "
+                        change_text = f"({change_symbol}{abs(stamina_change)})"
+
+                        # Draw stamina with highlighting
+                        base_surface = font.render(base_text, True, self.colors['text'])
+                        self.screen.blit(base_surface, (sidebar_x + 20, y_offset))
+                        x_offset = sidebar_x + 20 + base_surface.get_width()
+
+                        value_surface = font.render(value_text, True, highlight_color)
+                        self.screen.blit(value_surface, (x_offset, y_offset))
+                        x_offset += value_surface.get_width()
+
+                        suffix_surface = font.render(suffix_text, True, self.colors['text'])
+                        self.screen.blit(suffix_surface, (x_offset, y_offset))
+                        x_offset += suffix_surface.get_width()
+
+                        change_surface = font.render(change_text, True, highlight_color)
+                        self.screen.blit(change_surface, (x_offset, y_offset))
+
+                        y_offset += base_surface.get_height() + 2
+                    else:
+                        # Player has changes but not stamina
+                        self._draw_text(f"Stamina: {game_state.player.stamina}/{game_state.player.max_stamina}", sidebar_x + 20, y_offset, self.small_font)
+                        y_offset += 20
+                else:
+                    # No changes - show default stamina
+                    self._draw_text(f"Stamina: {game_state.player.stamina}/{game_state.player.max_stamina}", sidebar_x + 20, y_offset, self.small_font)
+                    y_offset += 20
+
             # Attack with change highlighting - separated format
             # Use the same highlighting logic as HP
             if should_highlight:
@@ -1363,6 +1415,11 @@ class GuiRenderer(Renderer):
         print(f"📍 位置: ({game_state.player.position.x}, {game_state.player.position.y})")
         print(f"🧭 向き: {game_state.player.direction.value}")
         print(f"❤️  HP: {game_state.player.hp}/{game_state.player.max_hp}")
+        # v1.2.13: スタミナ表示
+        from .hyperparameter_manager import HyperParameterManager
+        hyper_manager = HyperParameterManager()
+        if hyper_manager.data.enable_stamina:
+            print(f"⚡ スタミナ: {game_state.player.stamina}/{game_state.player.max_stamina}")
         print(f"⚔️ 攻撃力: {game_state.player.attack_power}")
         print(f"🎯 状態: {game_state.status.value}")
         
@@ -2132,7 +2189,8 @@ class GuiRenderer(Renderer):
         # Track player status first - only track values that can change
         player_status = {
             "hp": game_state.player.hp,
-            "attack": game_state.player.attack_power
+            "attack": game_state.player.attack_power,
+            "stamina": game_state.player.stamina  # v1.2.13
         }
         player_result = self.status_tracker.track_changes("player", player_status)
 

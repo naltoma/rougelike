@@ -432,18 +432,34 @@ class PickupCommand(Command):
 
 class WaitCommand(Command):
     """待機コマンド"""
-    
+
     def execute(self, game_state: GameState) -> WaitResult:
         """1ターン待機"""
         # プレイヤーは何もせず1ターンを過ごす
         # 敵の処理はGameStateManagerの_update_game_state()で行われる
-        
+
+        # v1.2.13: スタミナシステムでの回復判定（wait実行時点での判定）
+        from .hyperparameter_manager import HyperParameterManager
+        hyper_manager = HyperParameterManager()
+        stamina_recovery_message = ""
+
+        if hyper_manager.data.enable_stamina:
+            # 敵がアラート状態でないかチェック（安全な状況判定）
+            any_enemy_alerted = any(getattr(enemy, 'alerted', False) for enemy in game_state.enemies)
+
+            if not any_enemy_alerted:
+                # 安全な状況 → スタミナ回復（待機後に攻撃を受けないかは後でチェック）
+                recovered = game_state.player.recover_stamina(10)
+                if recovered > 0:
+                    stamina_recovery_message = f"\n✨ スタミナが{recovered}回復しました（現在: {game_state.player.stamina}/{game_state.player.max_stamina}）"
+
+        message = "1ターン待機しました" + stamina_recovery_message
         result = WaitResult(
             result=CommandResult.SUCCESS,
-            message="1ターン待機しました",
+            message=message,
             enemy_actions_triggered=0
         )
-        
+
         self.executed = True
         self.result = result
         return result

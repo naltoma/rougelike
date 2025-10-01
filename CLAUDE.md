@@ -32,6 +32,7 @@ Kiro-style Spec Driven Development implementation using claude code slash comman
 - `see-tutorial-documentation-v1.2.10`: see()関数チュートリアルドキュメント作成 - プログラミング初心者向けの段階的学習教材、stage01完全攻略手順（v1.2.10で完了） - 詳細は [docs/v1.2.10.md](docs/v1.2.10.md) 参照
 - `gui-enhancement-v1.2.11`: 動的ステージ名表示・ステータス変化強調表示システム（v1.2.11で完了） - 詳細は [docs/v1.2.11.md](docs/v1.2.11.md) 参照
 - `advanced-item-system-v1.2.12`: 不利アイテム・アイテムチェック操作・アイテム除去・ポーションHP回復・包括的ドキュメント・プロジェクト構造最適化（v1.2.12で完了） - 詳細は [docs/v1.2.12.md](docs/v1.2.12.md) 参照
+- `stamina-system-v1.2.13`: スタミナシステム導入 - ターン消費系アクションでのスタミナ消費・wait()での回復・ENABLE_STAMINAフラグでのON/OFF切替（v1.2.13で完了） - 詳細は [docs/v1.2.13.md](docs/v1.2.13.md) 参照
 
 ## Development Guidelines
 - Think in English, but generate responses in Japanese (思考は英語、回答の生成は日本語で行うように)

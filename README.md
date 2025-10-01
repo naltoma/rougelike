@@ -1,13 +1,13 @@
 # Python初学者向けローグライク演習フレームワーク
 
-[![Version](https://img.shields.io/badge/version-v1.2.12-blue.svg)](VERSION_HISTORY.md)
+[![Version](https://img.shields.io/badge/version-v1.2.13-blue.svg)](VERSION_HISTORY.md)
 [![Python](https://img.shields.io/badge/python-3.8+-green.svg)](https://python.org)
 [![Tests](https://img.shields.io/badge/tests-88.9%25-brightgreen.svg)](#🧪-テスト実行)
 [![Quality](https://img.shields.io/badge/quality-優良⭐-gold.svg)](#📈-品質メトリクス)
 
 Python初学者のための教育用ローグライクゲームフレームワークです。体験的なプログラミング学習を通じて、基礎的なプログラミングスキルを習得できます。
 
-> **💊 v1.2.12 高度アイテムシステム完成！** 不利アイテム・is_available/dispose API・ポーション回復・包括的ドキュメント・プロジェクト整理で学習体験を大幅向上 - 詳細は [docs/v1.2.12.md](docs/v1.2.12.md) をご覧ください
+> **⚡ v1.2.13 スタミナシステム導入！** ターン消費系アクションでスタミナ管理・wait()での回復・ENABLE_STAMINAフラグでON/OFF切替・get_stamina() API追加 - 詳細は [docs/v1.2.13.md](docs/v1.2.13.md) をご覧ください
 
 ## 🎯 特徴
 
@@ -28,6 +28,7 @@ Python初学者のための教育用ローグライクゲームフレームワ�
 - **🎯 ランダムステージ生成**: 5種類のステージタイプ自動生成・A*解法探索・無限学習コンテンツ
 - **🎨 GUI Enhancement**: 動的ステージ名表示・ステータス変化強調表示・ステップ実行維持
 - **💊 高度アイテムシステム**: 不利アイテム(bomb)・is_available/dispose API・ポーションHP回復機能
+- **⚡ スタミナシステム**: ターン消費(-1)・wait()回復(+10)・枯渇即死・ENABLE_STAMINAフラグ切替
 - **📚 包括的ドキュメント**: 全15ステージ詳細解説・段階的学習ガイド・プロジェクト構造最適化
 
 ### 📊 教師支援機能
@@ -98,6 +99,12 @@ rougelike/
 ```
 
 ## 🚀 クイックスタート
+- 以下をステージ毎に繰り返す。
+  - main.pyを複製して main_stage01.py を用意する。
+  - 必要に応じて、solve()前のハイパーパラメータ設定セクション（330行付近）を確認・修正する。
+  - フラグFalseで実行し、ステージやクリア条件を確認する。
+    - 用意されているステージは [docs/STAGES.md](./docs/STAGES.md) を参照してください。
+  - solve()を編集し、フラグTrueで動作確認する。
 
 ### 基本的な使用方法
 
@@ -122,6 +129,11 @@ game.wait()               # 1ターン待機（敵行動観察）
 # アクション
 game.attack()      # 攻撃
 game.pickup()      # アイテム拾得
+
+# スタミナ管理 (v1.2.13新機能、ENABLE_STAMINA=True時)
+stamina = game.get_stamina()  # 現在スタミナ取得
+if stamina < 5:
+    game.wait()  # スタミナ回復（敵非アラート時+10）
 
 # ゲーム状態確認
 if game.is_game_finished():
@@ -390,8 +402,9 @@ make test
 ## 📚 ドキュメント
 
 ### メインドキュメント
-- **[v1.2.11リリースノート](docs/v1.2.11.md)** - 最新アップデート詳細
-- **[v1.2.10リリースノート](docs/v1.2.10.md)** - seeチュートリアル体系化
+- **[v1.2.13リリースノート](docs/v1.2.13.md)** - 最新アップデート詳細（スタミナシステム）
+- **[v1.2.12リリースノート](docs/v1.2.12.md)** - 高度アイテムシステム
+- **[v1.2.11リリースノート](docs/v1.2.11.md)** - GUI Enhancement
 - **[バージョン履歴](VERSION_HISTORY.md)** - リリース履歴と変更点
 
 ### 📚 学習チュートリアル (v1.2.10 新機能)
@@ -434,12 +447,12 @@ Python初学者教育の向上を目指して開発されました。教育現�
 
 ## 📋 更新履歴
 
-最新バージョン: **v1.2.12** (2025年9月29日)
-- 💊 高度アイテムシステム - 不利アイテム(bomb)・is_available/dispose API・ポーションHP回復
-- 📚 包括的ドキュメント - 全15ステージ詳細解説・段階的学習ガイド
-- 🧹 プロジェクト整理 - ファイル構造最適化・テスト環境統合
-- 📈 学習効率向上 - 戦略的思考育成・包括的学習支援体制
-- 🔧 システム安定化 - A*パスファインディング修正・品質保証完成
+最新バージョン: **v1.2.13** (2025年9月30日)
+- ⚡ スタミナシステム導入 - ターン消費系アクションで-1、wait()で+10回復、枯渇で即死
+- 🎮 ENABLE_STAMINAフラグ - main.pyで簡単ON/OFF切替（デフォルト: OFF）
+- 🔧 get_stamina() API - 現在スタミナ取得、ENABLE_STAMINA=True時に自動有効化
+- 🎨 GUI/CUI表示強化 - スタミナゲージ表示、変化時ハイライト（英語表示対応）
+- 📚 包括的ドキュメント - 実装詳細・使用例・テストケース完備
 
 詳細な変更履歴は [VERSION_HISTORY.md](VERSION_HISTORY.md) をご覧ください。
 

@@ -1,0 +1,1 @@
+"""Integration tests for stamina system (v1.2.13)"""

@@ -153,6 +153,9 @@ class Character:
     # v1.2.12: プレイヤー専用フィールド（敵では使用されない）
     collected_items: List[str] = field(default_factory=list)
     disposed_items: List[str] = field(default_factory=list)
+    # v1.2.13: スタミナシステム
+    stamina: int = 20
+    max_stamina: int = 20
     
     def __post_init__(self):
         """バリデーション"""
@@ -224,6 +227,60 @@ class Character:
         if self.max_hp == 0:
             return 0.0
         return (self.hp / self.max_hp) * 100.0
+
+    # v1.2.13: スタミナシステムメソッド
+    def consume_stamina(self, amount: int = 1) -> bool:
+        """
+        スタミナを消費する
+
+        Args:
+            amount: 消費量（デフォルト1）
+
+        Returns:
+            bool: スタミナ枯渇による死亡が発生した場合True
+        """
+        if amount < 0:
+            return False
+
+        # スタミナ減少（最小0）
+        self.stamina = max(0, self.stamina - amount)
+
+        # スタミナ枯渇時は即死
+        if self.stamina <= 0:
+            self.hp = 0
+            return True
+
+        return False
+
+    def recover_stamina(self, amount: int) -> int:
+        """
+        スタミナを回復する（最大値を上限とする）
+
+        Args:
+            amount: 回復量
+
+        Returns:
+            int: 実際に回復した量
+        """
+        if amount < 0:
+            return 0
+
+        # 回復量を計算（max_staminaを超えない）
+        actual_recovery = min(amount, self.max_stamina - self.stamina)
+        self.stamina += actual_recovery
+
+        return actual_recovery
+
+    def stamina_percentage(self) -> float:
+        """
+        スタミナ残量を百分率で返す
+
+        Returns:
+            float: 0.0～100.0のスタミナ残量パーセンテージ
+        """
+        if self.max_stamina == 0:
+            return 0.0
+        return (self.stamina / self.max_stamina) * 100.0
 
 @dataclass
 class Enemy(Character):
@@ -615,6 +672,8 @@ class Stage:
     player_hp: Optional[int] = None  # ステージ固有のプレイヤーHP（Noneの場合はデフォルト値を使用）
     player_max_hp: Optional[int] = None  # ステージ固有の最大HP
     player_attack_power: Optional[int] = None  # ステージ固有の攻撃力
+    player_stamina: Optional[int] = None  # v1.2.13: ステージ固有のスタミナ
+    player_max_stamina: Optional[int] = None  # v1.2.13: ステージ固有の最大スタミナ
     victory_conditions: Optional[List[Dict[str, str]]] = None  # 勝利条件リスト
     
     def __post_init__(self):

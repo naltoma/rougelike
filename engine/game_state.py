@@ -30,6 +30,8 @@ class GameStateManager:
                        player_hp: Optional[int] = None,
                        player_max_hp: Optional[int] = None,
                        player_attack_power: Optional[int] = None,
+                       player_stamina: Optional[int] = None,  # v1.2.13
+                       player_max_stamina: Optional[int] = None,  # v1.2.13
                        stage_id: Optional[str] = None,
                        error_config: Optional[Dict[str, Any]] = None,
                        victory_conditions: Optional[List[Dict[str, str]]] = None) -> GameState:
@@ -43,14 +45,19 @@ class GameStateManager:
         final_hp = player_hp if player_hp is not None else 100
         final_max_hp = player_max_hp if player_max_hp is not None else final_hp
         final_attack_power = player_attack_power if player_attack_power is not None else 30
-        
+        # v1.2.13: スタミナのデフォルト値は20
+        final_stamina = player_stamina if player_stamina is not None else 20
+        final_max_stamina = player_max_stamina if player_max_stamina is not None else 20
+
         # プレイヤー作成
         player = Character(
             position=player_start,
             direction=player_direction,
             hp=final_hp,
             max_hp=final_max_hp,
-            attack_power=final_attack_power
+            attack_power=final_attack_power,
+            stamina=final_stamina,  # v1.2.13
+            max_stamina=final_max_stamina  # v1.2.13
         )
         
         # ゲーム状態作成
@@ -96,7 +103,21 @@ class GameStateManager:
         
         # コマンド実行
         result = self.command_invoker.execute_command(command, self.current_state)
-        
+
+        # v1.2.13: スタミナシステムが有効な場合、ターン消費系コマンドでスタミナを消費
+        from .hyperparameter_manager import HyperParameterManager
+        hyper_manager = HyperParameterManager()
+        if hyper_manager.data.enable_stamina:
+            # ターン消費系コマンド判定
+            turn_consuming_commands = {'movecommand', 'turnleftcommand', 'turnrightcommand',
+                                      'attackcommand', 'pickupcommand', 'disposecommand'}
+            command_name = command.__class__.__name__.lower()
+            if command_name in turn_consuming_commands:
+                # スタミナを消費（成功・失敗に関わらず消費）
+                death_by_stamina = self.current_state.player.consume_stamina(1)
+                if death_by_stamina:
+                    result.message += "\n⚠️ スタミナが尽きました！HPが0になりました。"
+
         # 特殊エラーハンドラーでアクションを記録
         if self.special_error_handler:
             action_name = command.__class__.__name__.lower().replace('command', '')
@@ -106,7 +127,7 @@ class GameStateManager:
                 "message": result.message
             }
             self.special_error_handler.record_action(action_name, context)
-        
+
         # ゲーム状態の更新（成功・失敗に関わらずターン消費）
         self._update_game_state()
         

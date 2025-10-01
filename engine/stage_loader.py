@@ -163,7 +163,23 @@ class StageLoader:
             attack_power = player_data["attack_power"]
             if not isinstance(attack_power, int) or attack_power < 0:
                 raise StageValidationError("player.attack_powerは0以上の整数である必要があります")
-    
+
+        # v1.2.13: スタミナ設定の検証（オプション）
+        if "stamina" in player_data:
+            stamina = player_data["stamina"]
+            if not isinstance(stamina, int) or stamina < 0:
+                raise StageValidationError("player.staminaは0以上の整数である必要があります")
+
+        if "max_stamina" in player_data:
+            max_stamina = player_data["max_stamina"]
+            if not isinstance(max_stamina, int) or max_stamina <= 0:
+                raise StageValidationError("player.max_staminaは正の整数である必要があります")
+
+        # スタミナと最大スタミナの関係性チェック
+        if "stamina" in player_data and "max_stamina" in player_data:
+            if player_data["stamina"] > player_data["max_stamina"]:
+                raise StageValidationError("player.staminaはplayer.max_stamina以下である必要があります")
+
     def _validate_goal(self, goal_data: Dict[str, Any]) -> None:
         """ゴールデータの検証"""
         if not isinstance(goal_data, dict):
@@ -274,7 +290,7 @@ class StageLoader:
             if not isinstance(allowed_apis, list):
                 raise StageValidationError("constraints.allowed_apisはリスト形式である必要があります")
             
-            valid_apis = ["turn_left", "turn_right", "move", "attack", "pickup", "wait", "see", "get_stage_info", "dispose", "is_available"]  # v1.2.12: bomb management APIs
+            valid_apis = ["turn_left", "turn_right", "move", "attack", "pickup", "wait", "see", "get_stage_info", "dispose", "is_available", "get_stamina"]  # v1.2.13: stamina API
             for api in allowed_apis:
                 if api not in valid_apis:
                     raise StageValidationError(f"無効なAPI: {api}. 有効なAPI: {valid_apis}")
@@ -398,6 +414,10 @@ class StageLoader:
         player_hp = player_data.get("hp")
         player_max_hp = player_data.get("max_hp")
         player_attack_power = player_data.get("attack_power")
+
+        # v1.2.13: スタミナ情報の抽出（オプション、デフォルト値: 20）
+        player_stamina = player_data.get("stamina", 20)
+        player_max_stamina = player_data.get("max_stamina", 20)
         
         # ゴール情報の抽出
         goal_data = data["goal"]
@@ -459,6 +479,8 @@ class StageLoader:
             player_hp=player_hp,
             player_max_hp=player_max_hp,
             player_attack_power=player_attack_power,
+            player_stamina=player_stamina,  # v1.2.13
+            player_max_stamina=player_max_stamina,  # v1.2.13
             enemies=enemies,
             items=items,
             walls=walls,

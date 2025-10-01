@@ -2,6 +2,90 @@
 
 Python初学者向けローグライク演習フレームワークのリリース履歴
 
+## v1.2.13 - 2025年9月30日 ⚡
+
+### ⚡ スタミナシステム導入 & リソース管理学習機能実装
+
+v1.2.13では、プレイヤーに**スタミナ（行動力）**の概念を導入し、ターン消費系アクションでのスタミナ管理を通じた新しい学習要素を追加しました。ENABLE_STAMINAフラグによる簡単なON/OFF切替で、既存システムとの後方互換性を維持しながら、高度なリソース管理戦略を学習できます。
+
+#### ⚡ スタミナ基本システム
+- **デフォルト値**: 初期スタミナ20/最大スタミナ20（ステージYAMLで個別設定可能）
+- **ターン消費系アクション**: move, turn_left, turn_right, attack, pickup, dispose で -1 消費
+- **wait()での回復**: 敵が非アラート状態なら +10 回復（最大値上限あり）
+- **枯渇時の即死**: スタミナ0でHP=0、即座にゲームオーバー
+- **調査系アクション**: see, get_stage_info, get_stamina はスタミナ消費なし
+
+#### 🎮 ENABLE_STAMINAフラグシステム
+- **簡単ON/OFF切替**: main.py で `ENABLE_STAMINA = True/False` 設定のみ
+- **デフォルトOFF**: 後方互換性維持（既存動作に影響なし）
+- **自動システム連携**: setup_stage()で自動的にHyperParameterManagerに反映
+- **リアルタイム表示**: 起動時に「⚡ スタミナシステム: 有効/無効」と表示
+
+#### 🔧 新API: get_stamina()
+- **現在スタミナ取得**: `stamina = get_stamina()` で現在値を取得
+- **自動有効化**: ENABLE_STAMINA=True時、全ステージで自動的に利用可能
+- **ターン/スタミナ消費なし**: 情報取得のみの非消費型API
+- **戦略的活用**: スタミナ残量に応じた行動判断が可能
+
+#### 🎨 GUI/CUI表示システム
+- **CUIスタミナ表示**: `⚡ スタミナ: 18/20` のようにシンプル表示
+- **GUIスタミナゲージ**: プレイヤー情報欄に `Stamina: 18/20` 表示
+- **変化ハイライト**:
+  - 減少時: オレンジ色でハイライト表示
+  - 回復時: シアン色でハイライト表示
+- **英語表示対応**: GUI文字化け防止（"Stamina:"）
+
+#### 📚 ステージYAML設定（オプション）
+```yaml
+player:
+  stamina: 10          # 初期スタミナ（省略可、デフォルト: 20）
+  max_stamina: 10      # 最大スタミナ（省略可、デフォルト: 20）
+```
+
+#### 🔧 技術実装詳細
+- **Character dataclass拡張**: stamina/max_stamina フィールド、consume_stamina()/recover_stamina()メソッド追加
+- **HyperParameterManager**: enable_staminaフラグ追加、シングルトンパターン実装
+- **StageLoader**: YAMLからスタミナ設定読み込み、バリデーション実装
+- **GameStateManager**: execute_command()でスタミナ消費判定、initialize_game()パラメータ拡張
+- **WaitCommand**: 敵非アラート時の +10 回復ロジック実装
+- **Renderer**: CUI/GUIスタミナ表示、StatusChangeTracker統合
+
+#### 🐛 修正した問題
+1. **ENABLE_STAMINAフラグ未接続問題**
+   - 問題: main.pyでENABLE_STAMINA=Trueを設定してもシステムに反映されない
+   - 原因: フラグがHyperParameterManagerに接続されていなかった
+   - 修正: setup_stage()でhyperparameter_manager.data.enable_stamina = ENABLE_STAMINAを追加
+
+2. **GUI表示文字化け問題**
+   - 問題: GUIスタミナ表示が文字化け
+   - 原因: 日本語「スタミナ:」使用
+   - 修正: 英語「Stamina:」に変更
+
+3. **get_stamina() API制限問題**
+   - 問題: ENABLE_STAMINA=True時でもステージYAMLにget_staminaがないと使えない
+   - 原因: allowed_apisがYAML記載内容のみを使用
+   - 修正: initialize_stage()でENABLE_STAMINA=True時に自動追加
+
+#### 🧪 テストケース
+- **test_enable_stamina_simple.py**: フラグ動作確認（シングルトン、設定連携）
+- **test_stamina_in_game.py**: 実ゲーム環境でのスタミナ消費確認
+- **test_stamina_api_auto_enable.py**: get_stamina()自動有効化確認
+- **tests/integration/test_stamina_*.py**: 統合テスト（消費、回復、無効化など）
+- **stages/test_stamina_*.yml**: テスト用ステージ（低スタミナ、回復テスト）
+- **全13ステージ動作確認済み**: test_all_stages.py で後方互換性確認完了
+
+#### 📈 学習効果
+- **リソース管理**: スタミナという有限資源の戦略的管理を学習
+- **行動計画**: スタミナ残量を考慮した長期的行動計画能力の育成
+- **トレードオフ判断**: 行動 vs 回復の選択、機会コストの理解
+- **条件分岐強化**: get_stamina()を活用した動的な戦略切替
+
+#### 🔗 関連ドキュメント
+- [docs/v1.2.13.md](docs/v1.2.13.md) - 詳細実装ドキュメント
+- [CLAUDE.md](CLAUDE.md) - プロジェクト履歴更新
+
+---
+
 ## v1.2.12 - 2025年9月29日 💊
 
 ### 🔬 高度アイテムシステム実装 & 包括的ドキュメント強化完成

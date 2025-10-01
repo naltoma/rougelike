@@ -59,6 +59,7 @@ def setup_stage(stage_id: str, student_id: str):
     ステージ初期化処理
     solve()実行前の準備作業を実行
     """
+    global ENABLE_STAMINA  # v1.2.13: グローバル変数参照
     logger.debug(f"ステージセットアップ開始: stage_id={stage_id}, student_id={student_id}")
     print(f"🔧 setup_stage() が呼び出されました: stage_id={stage_id}, student_id={student_id}")
     
@@ -159,7 +160,11 @@ def setup_stage(stage_id: str, student_id: str):
     
     # APIレイヤー初期化
     initialize_api("gui")  # デフォルトGUIモード
-    
+
+    # v1.2.13: スタミナシステム設定
+    hyperparameter_manager.data.enable_stamina = ENABLE_STAMINA
+    print(f"⚡ スタミナシステム: {'有効' if ENABLE_STAMINA else '無効'}")
+
     # execution_controllerをAPIレイヤーに設定
     from engine.api import _global_api
     _global_api.execution_controller = execution_controller
@@ -341,6 +346,9 @@ STUDENT_ID = "123456A"  # テスト用ID
 
 # ログ設定
 ENABLE_LOGGING = False  # セッションログを有効化
+
+# スタミナ制
+ENABLE_STAMINA = False # スタミナ制をOFF
 
 # ================================
 
